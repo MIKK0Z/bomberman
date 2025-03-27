@@ -16,9 +16,40 @@ $game_width = 31;
 $game_height = 13;
 $game_map = array();
 
-class Game implements JsonSerializable {
-    
+enum Tiles: string {
+    case Barrier = "X";
+    case BreakaleBarrier = "#";
+    case Grass = "*";
 }
+
+class Game implements JsonSerializable {
+    public static int $game_width = 31;
+    public static int $game_height = 13;
+
+    private Array $map = array();
+    
+    public function jsonSerialize() {
+	return get_object_vars($this);
+    }
+
+    public function init_map() {
+	for ($y = 0; $y < self::$game_height; $y++) {
+	    $new_row = array();
+	    for ($x = 0; $x < self::$game_width; $x++) {
+		array_push($new_row, "a");
+	    }
+	    array_push($this -> map, $new_row);
+	}	
+    }
+}
+
+$game = new Game();
+echo json_encode($game, JSON_PRETTY_PRINT);
+echo "\n\n";
+
+$game -> init_map();
+echo json_encode($game, JSON_PRETTY_PRINT);
+echo "\n";
 
 enum Direction: int {
     case Up = 0;
@@ -120,13 +151,6 @@ class Ballon extends MovingEntity {
     }    
 }
 
-function generateGameMap(Array &$map) {
-    $a = new Ballon(1, 2, Direction::Up);
-    array_push($map, $a);
-}
-
-generateGameMap($game_map);
-echo json_encode($game_map);
 
 return;
 
