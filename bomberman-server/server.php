@@ -14,9 +14,13 @@ $except = NULL;
 
 $game_width = 31;
 $game_height = 13;
-$game_board = array();
+$game_map = array();
 
-enum Direction: Int {
+class Game implements JsonSerializable {
+    
+}
+
+enum Direction: int {
     case Up = 0;
     case Right = 1;
     case Down = 2;
@@ -24,7 +28,7 @@ enum Direction: Int {
 }
 
 class Entity implements JsonSerializable {
-    public function __construct($x, $y) {
+    public function __construct(int $x, int $y) {
 	$this -> x = $x;
 	$this -> y = $y;
 	$this -> type = "entity";
@@ -35,92 +39,95 @@ class Entity implements JsonSerializable {
     }
 
     public function jsonSerialize() {
-	return [
-	    "type" => $this -> type,
-	    "x" => $this -> x,
-	    "y" => $this -> y,
-	];
+	return get_object_vars($this);
     }
 
-    private $x;
-    private $y;
-    private $type;
+    protected int $x = 0;
+    protected int $y = 0;
+    protected string $type = "";
 
-    public function get_x() {
+    public function get_x(): int {
 	return $this -> x;
     }
 
-    public function set_x($x) {
+    public function set_x(int $x): void {
 	$this -> x = $x;
     }
 
-    public function get_y() {
+    public function get_y(): int {
 	return $this -> y;
     }
 
-    public function set_y($y) {
+    public function set_y(int $y): void {
 	$this -> y = $y;
     }
 
-    public function get_type() {
+    public function get_type(): string {
 	return $this -> type;
     }
 
-    protected function set_type($type) {
+    protected function set_type(string $type): void {
 	$this -> type = $type;
     }
 }
 
 class Barrier extends Entity {
-    public function __construct($x, $y) {
+    public function __construct(int $x, int $y) {
 	parent::__construct($x, $y);
 	$this -> set_type("barrier");
     }
 }
 
 class BreakableBarrier extends Entity {
-    public function __construct($x, $y) {
+    public function __construct(int $x, int $y) {
 	parent::__construct($x, $y);
 	$this -> set_type("breakable_barrier");
     }
 }
 
 class MovingEntity extends Entity {
-    public function __construct($x, $y, $dir) {
+    public function __construct(int $x, int $y, Direction $dir) {
 	parent::__construct($x, $y);
 	$this -> set_type("moving_entity");
 	$this -> dir = $dir;
     }
     
-    public function jsonSerialize() {
-	return [
-	    "type" => $this -> type,
-	    "x" => $this -> x,
-	    "y" => $this -> y,
-	    "dir" => $this -> dir,
-	];
-    }
-
-    private $dir;
+    protected Direction $dir = Direction::Up;
+    protected float $vel = 0;
     
-    public function get_dir() {
+    public function get_dir(): Direction {
 	return $this -> dir;
     }
 
-    public function set_dir($dir) {
+    public function set_dir(Direction $dir) {
 	$this -> dir = $dir;
+    }
+
+    public function get_vel(): float {
+	return $this -> vel; 
+    }
+
+    protected function set_vel(int $vel) {
+	$this -> vel = $vel;
     }
 }
 
-class Ballon extends Entity {
-    public function __construct($x, $y) {
-	parent::__construct($x, $y);
+class Ballon extends MovingEntity {
+    public function __construct(int $x, int $y, Direction $dir) {
+	parent::__construct($x, $y, $dir);
 	$this -> set_type("ballon");
+	$this -> set_vel(10);
     }    
 }
 
-$a = new MovingEntity(1, 2, Direction::Up);
-echo json_encode($a -> get_type());
+function generateGameMap(Array &$map) {
+    $a = new Ballon(1, 2, Direction::Up);
+    array_push($map, $a);
+}
+
+generateGameMap($game_map);
+echo json_encode($game_map);
+
 return;
 
 echo "Server started at ws://" . $host . ":" . $port . "\n";
