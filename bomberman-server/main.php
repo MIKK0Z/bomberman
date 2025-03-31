@@ -13,14 +13,18 @@ require("./game.php");
 
 $game = new Game(GAME_WIDTH, GAME_HEIGHT);
 $game -> generate_map();
-echo json_encode($game);
 
-$test = function(string $var): string {
-    return $var;
+$mainloop = function(string $var): string {
+    global $game;
+    return json_encode($game -> get_map());
 };
 
-$server = new Server($test, HOST, PORT, TRANSPORT);
-$server -> init();
+$server = new Server($mainloop, HOST, PORT, TRANSPORT);
+$server_ok = $server -> init();
+if (!$server_ok) {
+   die("Server failed to initialize!"); 
+}
+
 $server -> start();
 
 return;
@@ -51,16 +55,16 @@ enum Direction: int {
 
 class Entity implements JsonSerializable {
     public function __construct(int $x, int $y) {
-	$this -> x = $x;
-	$this -> y = $y;
-	$this -> type = "entity";
+        $this -> x = $x;
+	    $this -> y = $y;
+	    $this -> type = "entity";
     }
 
-    public function __toString() {
+    public function __toString(): string {
 	return json_encode($this);
     }
 
-    public function jsonSerialize() {
+    public function jsonSerialize(): Array {
 	return get_object_vars($this);
     }
 

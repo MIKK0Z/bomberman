@@ -94,18 +94,25 @@ class Server {
 	    
         fclose($this -> server);
     }
-
+    /**
+     * @param mixed $clients
+     * @param mixed $msg
+     */
     public function send_message($clients, $msg): void {
 	    foreach ($clients as $changed_socket) {
 	        @fwrite($changed_socket, $msg);
 	    }
     }
-
+    /**
+     * @param mixed $text
+     */
     private function is_closing_frame($text): bool {
 	    $opcode = @ord($text[0]) & 0x0f;
 	    return $opcode == 8;
     }
-
+    /**
+     * @param mixed $text
+     */
     private function unmask($text): string {
 	    $length = @ord($text[1]) & 127;
 	    if ($length == 126) {
@@ -124,7 +131,9 @@ class Server {
 	    }
 	    return $text;
     }
-    
+    /**
+     * @param mixed $text
+     */
     private function mask($text): string {
 	    $b1 = 0x80 | (0x1 & 0x0f);
 	    $length = strlen($text);
@@ -137,7 +146,12 @@ class Server {
 	    }
 	    return $header . $text;
     }
-
+    /**
+     * @param mixed $client
+     * @param mixed $rcvd
+     * @param mixed $host
+     * @param mixed $port
+     */
     private function handshake($client, $rcvd, $host, $port): void {
 	    $headers = array();
 	    $lines = preg_split("/\r\n/", $rcvd);

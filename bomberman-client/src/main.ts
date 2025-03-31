@@ -12,7 +12,7 @@ const send = (data: any) => {
 
 const init = () => {
     ws.onopen = () => {
-        console.log('connected');
+        console.log("connected");
     }
 
     ws.onmessage = (event) => {
@@ -28,7 +28,7 @@ const init = () => {
     }
 
     ws.onclose = () => {
-        console.log('disconnected');
+        console.log("disconnected");
     }
 
     ws.onerror = (error) => {

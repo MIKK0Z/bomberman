@@ -22,7 +22,7 @@ class Game implements JsonSerializable {
         ];
     }
 
-    public function generate_map(): Array {
+    public function generate_map(): void {
 	    for ($y = 0; $y < $this -> game_height; $y++) {
 	        $new_row = array();
 	        for ($x = 0; $x < $this -> game_width; $x++) {
