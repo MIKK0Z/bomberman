@@ -87,9 +87,7 @@ class Server {
 		        }
 	        }
 
-	        $this -> send_message($this -> clients, $this -> mask(json_encode(["msg"=>"tick"])));
-	        echo($this -> mainloop)("asd");
-	        echo "\n";
+	        $this -> send_message($this -> clients, $this -> mask(json_encode(($this -> mainloop)("args"))));
 	    }
 	    
         fclose($this -> server);

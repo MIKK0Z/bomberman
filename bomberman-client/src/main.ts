@@ -6,6 +6,8 @@ const WS_URL = `ws://${WS_HOST}:${WS_PORT}`;
 
 const ws = new WebSocket(WS_URL);
 
+const canvas = document.querySelector<HTMLCanvasElement>("#map");
+
 const send = (data: any) => {
     ws.send(JSON.stringify(data));
 }
