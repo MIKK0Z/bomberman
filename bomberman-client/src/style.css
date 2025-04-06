@@ -1,3 +1,19 @@
-*, *::after, *::before {
-  box-sizing: border-box;
+@import "node_modules/modern-normalize/modern-normalize.css";
+
+*,
+*::after,
+*::before {
+    box-sizing: border-box;
+}
+
+#app {
+    width: 100dvw;
+    height: 100dvh;
+    background-color: #BFBFBF;
+    display: grid;
+    place-items: center;
+}
+
+canvas {
+    background-color: black;
 }

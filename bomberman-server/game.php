@@ -28,7 +28,7 @@ class Game implements JsonSerializable {
 	        for ($x = 0; $x < $this -> game_width; $x++) {
                 if ($y == 0 || $y == $this -> game_height - 1 || $x == 0 || $x == $this -> game_width - 1 || ($x % 2 == 0 && $y % 2 == 0)) {
                     array_push($new_row, Tiles::Barrier);
-                } elseif (rand(0, 100) < 20) {
+                } elseif (rand(0, 100) < 25) {
                     array_push($new_row, Tiles::BreakableBarrier);
                 } else {
                     array_push($new_row, Tiles::Grass);

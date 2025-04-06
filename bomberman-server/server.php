@@ -14,12 +14,13 @@ class Server {
     private $except = NULL;
 
     private $mainloop;
+    private $game_init;
 
     /**
-     * @param callable(): string $mainloop
+     * @param callable(): array $mainloop
      */
     public function __construct(callable $mainloop, string $host = "localhost", int $port = 46089, string $transport = "http") {
-	    $this -> mainloop = $mainloop;
+        $this -> mainloop = $mainloop;
 	    $this -> host = $host;
 	    $this -> port = $port;
     }
@@ -46,7 +47,7 @@ class Server {
 		        $client = @stream_socket_accept($this -> server);
 		        if (!$client) {
 		            continue;
-		        }
+                }
 
 		        array_push($this -> clients, $client);
 		        $ip = stream_socket_get_name($client, true);
@@ -85,9 +86,12 @@ class Server {
 		
 		            $this -> send_message($this -> clients, $buffer);
 		        }
-	        }
+            }
 
-	        $this -> send_message($this -> clients, $this -> mask(json_encode(($this -> mainloop)("args"))));
+            $this -> send_message(
+                $this -> clients,
+                $this -> mask(json_encode(($this -> mainloop)("")))
+            );
 	    }
 	    
         fclose($this -> server);

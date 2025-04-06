@@ -14,9 +14,14 @@ require("./game.php");
 $game = new Game(GAME_WIDTH, GAME_HEIGHT);
 $game -> generate_map();
 
-$mainloop = function(string $var): string {
+$mainloop = function(string $var): array {
     global $game;
-    return json_encode($game -> get_map());
+    
+    $state = array(
+        "map" => $game -> get_map(),
+    );
+
+    return $state;
 };
 
 $server = new Server($mainloop, HOST, PORT, TRANSPORT);
