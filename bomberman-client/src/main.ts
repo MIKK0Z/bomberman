@@ -94,8 +94,6 @@ sprite_sheet.init();
 
 const ws = new WebSocket(WS_URL);
 
-const canvas = document.querySelector<HTMLCanvasElement>("#map");
-
 const send = (data: any) => {
     ws.send(JSON.stringify(data));
 }
