@@ -153,3 +153,48 @@ const init = () => {
 
 init();
 
+window.addEventListener("keydown", (event) => {
+    switch (event.key) {
+        case "ArrowUp":
+            send("start_up");
+            break;
+
+        case "ArrowRight":
+            send("start_right");
+            break;
+
+        case "ArrowDown":
+            send("start_down");
+            break;
+
+        case "ArrowLeft":
+            send("start_left");
+            break;
+
+        default:
+            break;
+    }
+});
+
+window.addEventListener("keyup", (event) => {
+    switch (event.key) {
+        case "ArrowUp":
+            send("end_up");
+            break;
+
+        case "ArrowRight":
+            send("end_right");
+            break;
+
+        case "ArrowDown":
+            send("end_down");
+            break;
+
+        case "ArrowLeft":
+            send("end_left");
+            break;
+
+        default:
+            break;
+    }
+});
