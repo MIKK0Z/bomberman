@@ -14,7 +14,6 @@ class Server {
     private $except = NULL;
 
     private $mainloop;
-    private $game_init;
 
     /**
      * @param callable(): array $mainloop
