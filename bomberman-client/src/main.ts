@@ -108,6 +108,8 @@ const init = () => {
         if (jsonData != "") {
             try {
                 const gameData: GameData = JSON.parse(jsonData);
+                console.log(gameData)
+
                 const { map } = gameData;
 
                 if (!map || !ctx) return;

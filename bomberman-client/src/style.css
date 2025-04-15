@@ -1,5 +1,9 @@
 @import "/node_modules/modern-normalize/modern-normalize.css";
 
+:root {
+    --bg-color: "#BFBFBF";
+}
+
 *,
 *::after,
 *::before {
@@ -9,11 +13,11 @@
 #app {
     width: 100dvw;
     height: 100dvh;
-    background-color: #BFBFBF;
+    background-color: var(--bg-color);
     display: grid;
     place-items: center;
 }
 
 canvas {
-    background-color: black;
+    background-color: var(--bg-color);
 }

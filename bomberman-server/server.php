@@ -83,7 +83,8 @@ class Server {
 		                echo "\nReceived a Message from $ip:\n\"$unmasked\" \n";
 		            }
 		
-		            $this -> send_message($this -> clients, $buffer);
+                    $this -> send_message($this -> clients, $buffer);
+                    // wrzucać wiadomości do jakieś arraya zamiast wysyłać a potem w mainloopie handlować to (przkazać 5 linijek niżej)
 		        }
             }
 

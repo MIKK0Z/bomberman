@@ -1,12 +1,16 @@
 <?php
 declare(strict_types=1);
 
+require("./player.php");
+
 class Game implements JsonSerializable {
-    private Array $map = array();
+    private array $map = array();
 
     public function get_map(): Array {
         return $this -> map;
     }
+
+    private array $players = array();
 
     private int $game_width;
     private int $game_height;
@@ -36,6 +40,15 @@ class Game implements JsonSerializable {
             }
 	        array_push($this -> map, $new_row);
 	    }
+    }
+
+    public function add_player(mixed $client): void {
+        $new_player = new Player($client);
+        array_push($this -> players, $new_player);
+    }
+
+    public function get_players(): array {
+        return $this -> players;
     }
 }
 

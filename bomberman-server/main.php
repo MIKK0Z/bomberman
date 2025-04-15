@@ -10,6 +10,7 @@ const GAME_HEIGHT = 13;
 
 require("./server.php");
 require("./game.php");
+require("./player.php");
 
 $game = new Game(GAME_WIDTH, GAME_HEIGHT);
 $game -> generate_map();
@@ -22,6 +23,10 @@ $mainloop = function(string $var): array {
     );
 
     return $state;
+};
+
+$connect_new_player = function(mixed $client): void {
+    $player = new Player($client);
 };
 
 $server = new Server($mainloop, HOST, PORT, TRANSPORT);
