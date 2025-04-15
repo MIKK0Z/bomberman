@@ -20,6 +20,7 @@ $mainloop = function(string $var): array {
     
     $state = array(
         "map" => $game -> get_map(),
+        "players" => $game -> get_players(),
     );
 
     return $state;

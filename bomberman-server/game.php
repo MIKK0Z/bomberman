@@ -1,12 +1,10 @@
 <?php
 declare(strict_types=1);
 
-require("./player.php");
-
 class Game implements JsonSerializable {
     private array $map = array();
 
-    public function get_map(): Array {
+    public function get_map(): array {
         return $this -> map;
     }
 
@@ -23,6 +21,7 @@ class Game implements JsonSerializable {
     public function jsonSerialize(): Array {
         return [
             "map" => $this -> map,
+            "players" => $this -> players,
         ];
     }
 
@@ -49,6 +48,24 @@ class Game implements JsonSerializable {
 
     public function get_players(): array {
         return $this -> players;
+    }
+
+    public function get_player(string $ip): Player | false {
+        foreach ($this -> players as $player) {
+            if ($player -> ip == $ip) {
+                return $player; 
+            } 
+        }
+
+        return false;
+    }
+
+    public function remove_player(string $ip): bool {
+        $this -> players = array_filter($this -> players, function($player) {
+            global $ip;
+
+            return $player -> ip != $ip;
+        });
     }
 }
 

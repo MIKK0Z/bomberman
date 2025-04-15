@@ -17,7 +17,6 @@ class SpriteSheet {
     private readonly tile_size: number;
     private readonly scale: number;
 
-
     constructor(sprite_sheet_src: string, tile_size: number, scale: number) {
         this.sprite_sheet_src = sprite_sheet_src;
 
@@ -156,6 +155,8 @@ const init = () => {
 init();
 
 window.addEventListener("keydown", (event) => {
+    // TODO zrobić żeby się tylko raz wysyłało jak sie trzyma strzałek
+    console.warn(event)
     switch (event.key) {
         case "ArrowUp":
             send("start_up");
