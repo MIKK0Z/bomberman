@@ -14,12 +14,15 @@ class Server {
     private $except = NULL;
 
     private $mainloop;
+    private $connect_new_player;
 
     /**
      * @param callable(): array $mainloop
+     * @param callable(): void $connect_new_player
      */
-    public function __construct(callable $mainloop, string $host = "localhost", int $port = 46089, string $transport = "http") {
+    public function __construct(callable $mainloop, callable $connect_new_player, string $host = "localhost", int $port = 46089, string $transport = "http") {
         $this -> mainloop = $mainloop;
+        $this -> connect_new_player = $connect_new_player;
 	    $this -> host = $host;
 	    $this -> port = $port;
     }
@@ -48,7 +51,9 @@ class Server {
 		            continue;
                 }
 
-		        array_push($this -> clients, $client);
+                ($this -> connect_new_player)($client);
+
+		        //array_push($this -> clients, $client);
 		        $ip = stream_socket_get_name($client, true);
 		        echo "New Client connected from $ip\n";
 
@@ -96,26 +101,19 @@ class Server {
 	    
         fclose($this -> server);
     }
-    /**
-     * @param mixed $clients
-     * @param mixed $msg
-     */
-    public function send_message($clients, $msg): void {
+
+    public function send_message(Array $clients, string $msg): void {
 	    foreach ($clients as $changed_socket) {
 	        @fwrite($changed_socket, $msg);
 	    }
     }
-    /**
-     * @param mixed $text
-     */
-    private function is_closing_frame($text): bool {
+
+    private function is_closing_frame(string $text): bool {
 	    $opcode = @ord($text[0]) & 0x0f;
 	    return $opcode == 8;
     }
-    /**
-     * @param mixed $text
-     */
-    private function unmask($text): string {
+    
+    private function unmask(string $text): string {
 	    $length = @ord($text[1]) & 127;
 	    if ($length == 126) {
 	        $masks = substr($text, 4, 4);
@@ -133,10 +131,8 @@ class Server {
 	    }
 	    return $text;
     }
-    /**
-     * @param mixed $text
-     */
-    private function mask($text): string {
+    
+    private function mask(string $text): string {
 	    $b1 = 0x80 | (0x1 & 0x0f);
 	    $length = strlen($text);
 	    if ($length <= 125) {
@@ -148,13 +144,8 @@ class Server {
 	    }
 	    return $header . $text;
     }
-    /**
-     * @param mixed $client
-     * @param mixed $rcvd
-     * @param mixed $host
-     * @param mixed $port
-     */
-    private function handshake($client, $rcvd, $host, $port): void {
+
+    private function handshake(mixed $client, string $rcvd, string $host, int $port): void {
 	    $headers = array();
 	    $lines = preg_split("/\r\n/", $rcvd);
         foreach ($lines as $line) {
@@ -162,18 +153,18 @@ class Server {
 	        if (preg_match("/\A(\S+): (.*)\z/", $line, $matches)) {
 		        $headers[$matches[1]] = $matches[2];
 	        }
-	    }
+        }
+
 	    $secKey = $headers["Sec-WebSocket-Key"];
 	    $secAccept = base64_encode(pack("H*", sha1($secKey . "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
-	    //hand shaking header
-	    $upgrade  = "HTTP/1.1 101 Web Socket Protocol Handshake\r\n" .
+	    $upgrade_header  = "HTTP/1.1 101 Web Socket Protocol Handshake\r\n" .
 	        "Upgrade: websocket\r\n" .
 	        "Connection: Upgrade\r\n" .
 	        "WebSocket-Origin: $host\r\n" .
 	        "WebSocket-Location: ssl://$host:$port\r\n" .
 	        "Sec-WebSocket-Version: 13\r\n".
 	        "Sec-WebSocket-Accept:$secAccept\r\n\r\n";
-	    fwrite($client, $upgrade);
+	    fwrite($client, $upgrade_header);
     }    
 }
 

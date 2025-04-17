@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class Player implements JsonSerializable {
     private string $ip;
-    private object $client;
+    private mixed $client;
 
     private bool $going_up = false;
     private bool $going_right = false;

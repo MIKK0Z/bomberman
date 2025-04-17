@@ -30,9 +30,8 @@ $connect_new_player = function(mixed $client): void {
     $player = new Player($client);
 };
 
-$server = new Server($mainloop, HOST, PORT, TRANSPORT);
-$server_ok = $server -> init();
-if (!$server_ok) {
+$server = new Server($mainloop, $connect_new_player, HOST, PORT, TRANSPORT);
+if (!$server -> init()) {
    die("Server failed to initialize!"); 
 }
 
