@@ -103,6 +103,8 @@ const init = () => {
     }
 
     ws.onmessage = (event) => {
+        console.log(event)
+
         const jsonData = event.data;
         if (jsonData != "") {
             try {

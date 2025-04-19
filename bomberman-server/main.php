@@ -30,7 +30,13 @@ $connect_new_player = function(mixed $client): void {
     $player = new Player($client);
 };
 
-$server = new Server($mainloop, $connect_new_player, HOST, PORT, TRANSPORT);
+$get_players = function(): array {
+    global $game;
+
+    return $game -> get_players();
+};
+
+$server = new Server($mainloop, $connect_new_player, $get_players, HOST, PORT, TRANSPORT);
 if (!$server -> init()) {
    die("Server failed to initialize!"); 
 }

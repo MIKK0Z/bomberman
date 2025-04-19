@@ -15,14 +15,17 @@ class Server {
 
     private $mainloop;
     private $connect_new_player;
+    private $get_players;
 
     /**
      * @param callable(): array $mainloop
      * @param callable(): void $connect_new_player
+     * @param callable(): array $get_players
      */
-    public function __construct(callable $mainloop, callable $connect_new_player, string $host = "localhost", int $port = 46089, string $transport = "http") {
+    public function __construct(callable $mainloop, callable $connect_new_player, callable $get_players, string $host = "localhost", int $port = 46089, string $transport = "http") {
         $this -> mainloop = $mainloop;
         $this -> connect_new_player = $connect_new_player;
+        $this -> get_players = $get_players;
 	    $this -> host = $host;
 	    $this -> port = $port;
     }
@@ -40,7 +43,7 @@ class Server {
 
     public function start(): void {
 	    echo "Server started at ws://" . $this -> host . ":" . $this -> port . "\n";
-	
+	 
 	    while (true) {
 	        $changed = $this -> clients;
 	        stream_select($changed, $this -> write, $this -> except, self::$tick_length);
@@ -69,9 +72,11 @@ class Server {
 		        unset($changed[$found_socket]);
             }
 
-            $this -> clients = array_map(function() {
-            
-            }, 
+            $this -> clients = array_map(function($player) {
+                return $player -> ip;
+            }, ($this -> get_players)());
+
+            array_push($this -> clients, $this -> server);
 
 	        foreach ($changed as $changed_socket) {
 		        print_r($changed_socket);
