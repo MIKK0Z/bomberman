@@ -67,7 +67,11 @@ class Server {
 
 		        $found_socket = array_search($this -> server, $changed);
 		        unset($changed[$found_socket]);
-	        }
+            }
+
+            $this -> clients = array_map(function() {
+            
+            }, 
 
 	        foreach ($changed as $changed_socket) {
 		        print_r($changed_socket);
