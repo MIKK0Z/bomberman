@@ -106,6 +106,8 @@ class Server {
                 $this -> clients,
                 $this -> mask(json_encode(($this -> mainloop)("")))
             );
+
+            print_r($this -> clients);
 	    }
 	    
         fclose($this -> server);
