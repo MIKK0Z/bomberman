@@ -8,33 +8,14 @@ ini_set("memory_limit", "512M");
 // Define constants first
 const GAME_WIDTH = 31;
 const GAME_HEIGHT = 13;
-const BREAKABLE_WALL_DENSITY = 0.1; // chance of a breakable wall in a cell (0.0 - 1.0)
+const BREAKABLE_WALL_DENSITY = 0.2; // chance of a breakable wall in a cell (0.0 - 1.0)
 const BALLOON_COUNT = 5;
-const TICK_LENGTH = 10; // seconds
+const TICK_LENGTH = 1; // seconds
+const PLAYER_SPEED = 100;
 
 require_once __DIR__ . "/env.php";
 require_once __DIR__ . "/Player.php";
 require_once __DIR__ . "/Tile.php";
-
-// Remove the Tile enum definition from here
-/*
-enum Tile: int {
-    case Wall = 0;
-    case BreakableWall = 1;
-    case Grass = 2;
-}
-*/
-
-// Remove duplicate constant definitions
-/*
-const GAME_WIDTH = 31;
-const GAME_HEIGHT = 13;
-
-const BREAKABLE_WALL_DENSITY = 0.1; // chance of a breakable wall in a cell (0.0 - 1.0)
-const BALLOON_COUNT = 5;
-
-const TICK_LENGTH = 10; // seconds
-*/
 
 /** @var array<Player> $players */
 $players = array();
@@ -130,6 +111,7 @@ while (true) {
                 "map_height" => GAME_HEIGHT,
                 "map" => $map,
                 "players" => $players,
+                "player_speed" => PLAYER_SPEED,
             )),
             $client,
         );
@@ -197,6 +179,7 @@ while (true) {
             ws_send(
                 json_encode(array(
                     "type" => "player_disconnected",
+                    // "player_id" => $player->getId(),
                     "player_id" => $peerName,
                 )),
                 $player_clients,
@@ -213,16 +196,15 @@ while (true) {
     $delta_time = microtime(true) - $prev_time;
     $prev_time = microtime(true);
 
-    // Update player positions
-    foreach ($players as $player) {
-        $player->move($delta_time, $map);
-    }
-
+    // Update player velocities
     foreach ($players_to_update as $peerName => $message) {
         foreach ($players as $player) {
             if ($player->getPeerName() === $peerName) {
-                $player->setVelX(signum(floatval($message["vel_x"])));
-                $player->setVelY(signum(floatval($message["vel_y"])));
+                // Only update velocity from client messages
+                if (isset($message["vel_x"]) && isset($message["vel_y"])) {
+                    $player->setVelX(intval($message["vel_x"]));
+                    $player->setVelY(intval($message["vel_y"]));
+                }
                 break;
             }
         }
@@ -231,12 +213,21 @@ while (true) {
     // Extract client resources from Player objects
     $client_resources = array_map(fn(Player $player) => $player->getClient(), $players);
 
+    // Only send velocity data in updates
+    $velocity_updates = array_map(function ($player) {
+        return [
+            'id' => $player->getId(),
+            'vel_x' => $player->getVelX(),
+            'vel_y' => $player->getVelY(),
+        ];
+    }, $players);
+
     ws_send(
         json_encode(array(
             "type" => "update",
-            "players" => $players, // Sending player data is fine
+            "players" => $velocity_updates,
         )),
-        $client_resources, // Send to the actual socket resources
+        $client_resources,
     );
 }
 

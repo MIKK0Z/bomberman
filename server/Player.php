@@ -17,6 +17,8 @@ class Player implements JsonSerializable {
     private int $vel_x;
     private int $vel_y;
 
+    static private int $TILE_SIZE = 32;
+
     /**
      * Constructor for the Player class.
      * 
@@ -28,8 +30,8 @@ class Player implements JsonSerializable {
 
         $this->id = uniqid();
 
-        $this->pos_x = 1;
-        $this->pos_y = 1;
+        $this->pos_x = self::$TILE_SIZE;
+        $this->pos_y = self::$TILE_SIZE;
 
         $this->vel_x = 0;
         $this->vel_y = 0;
@@ -89,54 +91,6 @@ class Player implements JsonSerializable {
 
     public function setVelY(int $vel_y): void {
         $this->vel_y = $vel_y;
-    }
-
-    /** 
-     * Move the player based on velocity and delta time, checking for collisions.
-     * 
-     * @param float $delta_time The time delta since the last update.
-     * @param array<array<Tile>> $map The game map for collision detection.
-     * @return void
-     */
-    public function move(float $delta_time, array $map): void {
-        $next_x = $this->pos_x + $this->vel_x * $delta_time;
-        $next_y = $this->pos_y + $this->vel_y * $delta_time;
-
-        // Check collision on X axis
-        $check_x = $next_x;
-        $check_y = $this->pos_y; // Use current Y for X-axis check
-
-        $tile_x_index = floor($check_x + ($this->vel_x > 0 ? 1.0 : 0.0)); // Check tile in direction of movement
-        $tile_y_index = floor($check_y + 0.0); // Check middle of player height
-
-        if (
-            isset($map[$tile_y_index][$tile_x_index]) &&
-            ($map[$tile_y_index][$tile_x_index] === Tile::Wall || $map[$tile_y_index][$tile_x_index] === Tile::BreakableWall)
-        ) {
-            // Collision on X, don't update pos_x
-        } else {
-            $this->pos_x = $next_x;
-        }
-
-        // Check collision on Y axis
-        $check_x = $this->pos_x; // Use potentially updated X for Y-axis check
-        $check_y = $next_y;
-
-        $tile_x_index = floor($check_x + 0.0); // Check middle of player width
-        $tile_y_index = floor($check_y + ($this->vel_y > 0 ? 1.0 : 0.0)); // Check tile in direction of movement
-
-        if (
-            isset($map[$tile_y_index][$tile_x_index]) &&
-            ($map[$tile_y_index][$tile_x_index] === Tile::Wall || $map[$tile_y_index][$tile_x_index] === Tile::BreakableWall)
-        ) {
-            // Collision on Y, don't update pos_y
-        } else {
-            $this->pos_y = $next_y;
-        }
-
-        // Optional: Clamp position to map boundaries (if needed, though walls should prevent this)
-        // $this->pos_x = max(1.0, min(GAME_WIDTH - 2.0, $this->pos_x)); // Assuming 1-unit border walls
-        // $this->pos_y = max(1.0, min(GAME_HEIGHT - 2.0, $this->pos_y));
     }
 
     public function jsonSerialize(): mixed {
