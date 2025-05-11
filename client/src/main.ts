@@ -35,9 +35,6 @@ type Player = {
     pos_y: number;
     vel_x: number;
     vel_y: number;
-    // Add render positions for smooth interpolation
-    render_pos_x: number;
-    render_pos_y: number;
 }
 type Map = Array<Array<Tile>>;
 type ServerMessage =
@@ -54,7 +51,7 @@ class SpriteSheet {
     private readonly sprite_sheet_src: string;
 
     private sprite_sheet: HTMLImageElement | null = null;
-    private isLoaded: boolean = false;;
+    private isLoaded: boolean = false;
 
     private readonly sprite_size: number;
     private readonly tile_size: number;
@@ -132,76 +129,7 @@ const initWebSocket = async (): Promise<void> => {
                 console.info("Info: WebSocket connected");
                 resolve();
             }
-            ws.onerror = (error) => {
-                console.error("Error: WebSocket error", error);
-                reject(error);
-            }
-            ws.onclose = (event) => {
-                console.warn("Warn: WebSocket closed", event);
-                ws = null;
-            }
-            ws.onmessage = (event) => {
-                const message: ServerMessage = JSON.parse(event.data);
-                switch (message.type) {
-                    case "connection":
-                        console.info("Info: Connection message", message);
-                        canvas.width = message.map_width * TILE_SIZE;
-                        canvas.height = message.map_height * TILE_SIZE;
-                        map = message.map;
-                        // Initialize players with render positions
-                        players = message.players.map(p => ({
-                            ...p,
-                            render_pos_x: p.pos_x,
-                            render_pos_y: p.pos_y,
-                        }));
-                        player_speed = message.player_speed;
-                        break;
 
-                    case "new_player":
-                        console.info("Info: New player message", message);
-                        // Add new player with initial render position
-                        players.push({
-                            ...message.player,
-                            render_pos_x: message.player.pos_x,
-                            render_pos_y: message.player.pos_y,
-                        });
-                        break;
-
-                    case "player_disconnect":
-                        console.info("Info: Player disconnect message", message);
-                        players = players.filter((player) => player.id !== message.player_id);
-                        break;
-
-                    case "update":
-                        // Updates now only contain velocity information, not position
-                        message.players.forEach(updatedPlayer => {
-                            const existingPlayer = players.find(p => p.id === updatedPlayer.id);
-                            if (existingPlayer) {
-                                // Only update velocity from server updates now
-                                // Position will be calculated locally in the game loop
-                                existingPlayer.vel_x = updatedPlayer.vel_x;
-                                existingPlayer.vel_y = updatedPlayer.vel_y;
-                            } else if (updatedPlayer.id && updatedPlayer.vel_x !== undefined && updatedPlayer.vel_y !== undefined) {
-                                // Add if player joined between connection and first update
-                                // Create a new player with default position but correct velocity
-                                console.warn("Warn: Received update for unknown player", updatedPlayer.id);
-                                players.push({
-                                    id: updatedPlayer.id,
-                                    vel_x: updatedPlayer.vel_x,
-                                    vel_y: updatedPlayer.vel_y,
-                                    pos_x: TILE_SIZE, // Default position
-                                    pos_y: TILE_SIZE, // Default position
-                                    render_pos_x: TILE_SIZE,
-                                    render_pos_y: TILE_SIZE
-                                });
-                            }
-                        });
-                        break;
-
-                    default:
-                        console.warn("Warn: Unknown message type", message);
-                }
-            }
         } catch (error) {
             console.error("Error: Failed to initialize WebSocket", error);
             reject(error);
@@ -221,7 +149,6 @@ const gameLoop = () => {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw the map
     for (let y = 0; y < map.length; y++) {
         for (let x = 0; x < map[y].length; x++) {
             const tile = map[y][x];
@@ -239,141 +166,10 @@ const gameLoop = () => {
         }
     }
 
-    // Find our local player (first player in the array)
-    const localPlayer = players.length > 0 ? players[0] : null;
-    let localPlayerVelocityChanged = false;
-    let previousVelX = localPlayer?.vel_x;
-    let previousVelY = localPlayer?.vel_y;
-
-    // Update and draw all players (including local and remote players)
-    for (const player of players) {
-        // For all players, apply movement calculations based on velocity
-        // Implement continuous collision detection by breaking movement into smaller steps
-        // This prevents "tunneling" through walls when moving fast or with large delta time
-        const stepSize = 0.05; // 50ms steps for collision detection
-        let remainingDelta = deltaTime;
-
-        while (remainingDelta > 0) {
-            // Calculate the current step's delta time
-            const stepDelta = Math.min(stepSize, remainingDelta);
-            remainingDelta -= stepDelta;
-
-            // Calculate potential new positions based on velocity for this step
-            const new_pos_x = player.pos_x + player.vel_x * stepDelta * player_speed;
-            const new_pos_y = player.pos_y + player.vel_y * stepDelta * player_speed;
-
-            // Handle horizontal and vertical movement separately to allow sliding along walls
-            if (player.vel_x !== 0) {
-                const result = checkHorizontalCollision(player, new_pos_x, map);
-                if (result.canMove) {
-                    player.pos_x = new_pos_x;
-                } else if (result.snapPosition !== null) {
-                    // Snap to edge of blocking tile
-                    player.pos_x = result.snapPosition;
-
-                    // If this is the local player and they hit a wall, stop their movement in that direction
-                    if (localPlayer && player.id === localPlayer.id) {
-                        player.vel_x = 0;
-                        localPlayerVelocityChanged = true;
-                    }
-                }
-            }
-
-            if (player.vel_y !== 0) {
-                const result = checkVerticalCollision(player, new_pos_y, map);
-                if (result.canMove) {
-                    player.pos_y = new_pos_y;
-                } else if (result.snapPosition !== null) {
-                    // Snap to edge of blocking tile
-                    player.pos_y = result.snapPosition;
-
-                    // If this is the local player and they hit a wall, stop their movement in that direction
-                    if (localPlayer && player.id === localPlayer.id) {
-                        player.vel_y = 0;
-                        localPlayerVelocityChanged = true;
-                    }
-                }
-            }
-        }
-
-        sprite_sheet.drawSprite(ctx, 0, 0, player.pos_x, player.pos_y);
-    }
-
-    // If the local player's velocity changed (due to key press or wall collision), send update to the server
-    if (localPlayer && ws && ws.readyState === WebSocket.OPEN) {
-        if (localPlayerVelocityChanged ||
-            (localPlayer.vel_x !== previousVelX || localPlayer.vel_y !== previousVelY)) {
-            ws.send(JSON.stringify({
-                vel_x: localPlayer.vel_x,
-                vel_y: localPlayer.vel_y
-            }));
-        }
-    }
 
     requestAnimationFrame(gameLoop);
 }
 
-/**
- * Check if a player can move horizontally without colliding with walls
- * 
- * @param player The player to check
- * @param new_pos_x The new x position
- * @param map The game map
- * @returns Object with canMove flag and snapPosition if collision detected
- */
-const checkHorizontalCollision = (player: Player, new_pos_x: number, map: Map): { canMove: boolean, snapPosition: number | null } => {
-    // Get the tile coordinates from pixel coordinates
-    const next_tile_x = Math.floor((new_pos_x + (player.vel_x > 0 ? TILE_SIZE - 1 : 0)) / TILE_SIZE);
-    const top_tile_y = Math.floor(player.pos_y / TILE_SIZE);
-    const bottom_tile_y = Math.floor((player.pos_y + TILE_SIZE - 1) / TILE_SIZE);
-
-    // Check all tiles that the player would intersect with
-    for (let check_y = top_tile_y; check_y <= bottom_tile_y; check_y++) {
-        if (map[check_y] && map[check_y][next_tile_x] !== undefined) {
-            const tile = map[check_y][next_tile_x];
-            if (tile === Tile.Wall || tile === Tile.BreakableWall) {
-                // Collision detected - calculate position to snap to
-                const snapPosition = player.vel_x > 0
-                    ? next_tile_x * TILE_SIZE - TILE_SIZE  // Snap to left edge of wall when moving right
-                    : (next_tile_x + 1) * TILE_SIZE;       // Snap to right edge of wall when moving left
-                return { canMove: false, snapPosition };
-            }
-        }
-    }
-
-    return { canMove: true, snapPosition: null };
-}
-
-/**
- * Check if a player can move vertically without colliding with walls
- * 
- * @param player The player to check
- * @param new_pos_y The new y position
- * @param map The game map
- * @returns Object with canMove flag and snapPosition if collision detected
- */
-const checkVerticalCollision = (player: Player, new_pos_y: number, map: Map): { canMove: boolean, snapPosition: number | null } => {
-    // Get the tile coordinates from pixel coordinates
-    const next_tile_y = Math.floor((new_pos_y + (player.vel_y > 0 ? TILE_SIZE - 1 : 0)) / TILE_SIZE);
-    const left_tile_x = Math.floor(player.pos_x / TILE_SIZE);
-    const right_tile_x = Math.floor((player.pos_x + TILE_SIZE - 1) / TILE_SIZE);
-
-    // Check all tiles that the player would intersect with
-    for (let check_x = left_tile_x; check_x <= right_tile_x; check_x++) {
-        if (map[next_tile_y] && map[next_tile_y][check_x] !== undefined) {
-            const tile = map[next_tile_y][check_x];
-            if (tile === Tile.Wall || tile === Tile.BreakableWall) {
-                // Collision detected - calculate position to snap to
-                const snapPosition = player.vel_y > 0
-                    ? next_tile_y * TILE_SIZE - TILE_SIZE  // Snap to top edge of wall when moving down
-                    : (next_tile_y + 1) * TILE_SIZE;       // Snap to bottom edge of wall when moving up
-                return { canMove: false, snapPosition };
-            }
-        }
-    }
-
-    return { canMove: true, snapPosition: null };
-}
 
 const initGame = async () => {
     console.info("Info: Initializing game...");
@@ -398,6 +194,46 @@ const initGame = async () => {
         sprite_sheet = new SpriteSheet(sprite_sheet_src, SPRITE_SIZE, TILE_SIZE);
         await sprite_sheet.init();
         await initWebSocket();
+
+        if (!ws) return; // Should never happen
+
+        ws.onerror = (error) => {
+            console.error("Error: WebSocket error", error);
+        }
+        ws.onclose = (event) => {
+            console.warn("Warn: WebSocket closed", event);
+            ws = null;
+        }
+        ws.onmessage = (event) => {
+            const message: ServerMessage = JSON.parse(event.data);
+            switch (message.type) {
+                case "connection":
+                    console.info("Info: Connection message", message);
+                    canvas.width = message.map_width * TILE_SIZE;
+                    canvas.height = message.map_height * TILE_SIZE;
+                    map = message.map;
+                    players = message.players;
+                    player_speed = message.player_speed;
+                    break;
+
+                case "new_player":
+                    console.info("Info: New player message", message);
+                    players.push(message.player);
+                    break;
+
+                case "player_disconnect":
+                    console.info("Info: Player disconnect message", message);
+                    players = players.filter((player) => player.id !== message.player_id);
+                    break;
+
+                case "update":
+
+                    break;
+
+                default:
+                    console.warn("Warn: Unknown message type", message);
+            }
+        }
 
         console.info("Info: Game initialized");
         gameLoop();
@@ -427,3 +263,6 @@ const parsePresedKeys = (pressedKeys: Set<string>): { vel_x: number, vel_y: numb
 }
 
 initGame()
+
+
+

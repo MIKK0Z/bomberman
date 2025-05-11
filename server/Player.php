@@ -9,7 +9,6 @@ class Player implements JsonSerializable {
     private $client;
 
     private readonly string $peerName;
-    private readonly string $id;
 
     private float $pos_x;
     private float $pos_y;
@@ -17,7 +16,9 @@ class Player implements JsonSerializable {
     private int $vel_x;
     private int $vel_y;
 
-    static private int $TILE_SIZE = 32;
+    private string $fragmented_message = "";
+    private int $fragmented_opcode = 0;
+    private string $socket_buffer = "";
 
     /**
      * Constructor for the Player class.
@@ -28,10 +29,8 @@ class Player implements JsonSerializable {
         $this->client = $client;
         $this->peerName = stream_socket_get_name($client, true);
 
-        $this->id = uniqid();
-
-        $this->pos_x = self::$TILE_SIZE;
-        $this->pos_y = self::$TILE_SIZE;
+        $this->pos_x = 1;
+        $this->pos_y = 1; // it should be multiplied by TILE_SIZE on client side
 
         $this->vel_x = 0;
         $this->vel_y = 0;
@@ -55,10 +54,6 @@ class Player implements JsonSerializable {
 
     public function getPeerName(): string {
         return $this->peerName;
-    }
-
-    public function getId(): string {
-        return $this->id;
     }
 
     public function getPosX(): float {
@@ -93,9 +88,42 @@ class Player implements JsonSerializable {
         $this->vel_y = $vel_y;
     }
 
+    public function getFragmentedMessage(): string {
+        return $this->fragmented_message;
+    }
+
+    public function setFragmentedMessage(string $fragmented_message): void {
+        $this->fragmented_message = $fragmented_message;
+    }
+
+    public function getFragmentedOpcode(): int {
+        return $this->fragmented_opcode;
+    }
+
+    public function setFragmentedOpcode(int $fragmented_opcode): void {
+        $this->fragmented_opcode = $fragmented_opcode;
+    }
+
+    public function getSocketBuffer(): string {
+        return $this->socket_buffer;
+    }
+
+    public function appendToSocketBuffer(string $data): void {
+        $this->socket_buffer .= $data;
+    }
+
+    public function consumeFromSocketBuffer(int $length): void {
+        if ($length > 0) {
+            $this->socket_buffer = substr($this->socket_buffer, $length);
+        }
+    }
+
+    public function clearSocketBuffer(): void {
+        $this->socket_buffer = "";
+    }
+
     public function jsonSerialize(): mixed {
         return array(
-            "id" => $this->id,
             "pos_x" => $this->pos_x,
             "pos_y" => $this->pos_y,
             "vel_x" => $this->vel_x,
