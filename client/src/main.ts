@@ -1,3 +1,5 @@
+"use strict";
+
 import "modern-normalize/modern-normalize.css";
 
 import "./style.css";
@@ -22,6 +24,7 @@ const ctx = canvas.getContext("2d")!;
 app.appendChild(canvas);
 
 let lastFrameTime = performance.now();
+let peer_name: string | null = null;
 
 enum Tile {
     Wall = 0,
@@ -30,21 +33,20 @@ enum Tile {
 }
 
 type Player = {
-    id: string;
     pos_x: number;
     pos_y: number;
     vel_x: number;
     vel_y: number;
 }
-type Map = Array<Array<Tile>>;
+type GameMap = Array<Array<Tile>>;
 type ServerMessage =
-    | { type: "connection"; map_width: number; map_height: number, map: Map, players: Array<Player>, player_speed: number }
-    | { type: "new_player"; player: Player }
-    | { type: "player_disconnect"; player_id: string }
-    | { type: "update", players: Array<Player> }
+    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: Player }, player_speed: number, peer_name: string }
+    | { type: "new_player"; peer_name: string, player: Player }
+    | { type: "player_disconnected"; peer_name: string }
+    | { type: "player_update", peer_name: string, player: Player }
 
-let players: Array<Player> = [];
-let map: Map = [];
+let players: { [key: string]: Player } = {};
+let map: GameMap = [];
 let player_speed = 1;
 
 class SpriteSheet {
@@ -166,6 +168,13 @@ const gameLoop = () => {
         }
     }
 
+    for (const [_peer_name, player] of Object.entries(players)) {
+        player.pos_x += player.vel_x * player_speed * deltaTime;
+        player.pos_y += player.vel_y * player_speed * deltaTime;
+
+        sprite_sheet.drawSprite(ctx, 0, 0, player.pos_x * TILE_SIZE, player.pos_y * TILE_SIZE);
+    }
+
 
     requestAnimationFrame(gameLoop);
 }
@@ -179,7 +188,7 @@ const initGame = async () => {
         }
         pressedKeys.add(event.key.slice(5));
 
-        if (ws) ws.send(JSON.stringify(parsePresedKeys(pressedKeys)));
+        if (ws && peer_name) ws.send(JSON.stringify({ ...parsePresedKeys(pressedKeys), pos_x: players[peer_name].pos_x, pos_y: players[peer_name].pos_y }));
     });
     document.addEventListener("keyup", (event) => {
         if (!event.key.startsWith("Arrow") || event.repeat) {
@@ -187,7 +196,7 @@ const initGame = async () => {
         }
         pressedKeys.delete(event.key.slice(5));
 
-        if (ws) ws.send(JSON.stringify(parsePresedKeys(pressedKeys)));
+        if (ws && peer_name) ws.send(JSON.stringify({ ...parsePresedKeys(pressedKeys), pos_x: players[peer_name].pos_x, pos_y: players[peer_name].pos_y }));
     });
 
     try {
@@ -214,25 +223,29 @@ const initGame = async () => {
                     map = message.map;
                     players = message.players;
                     player_speed = message.player_speed;
+                    peer_name = message.peer_name;
                     break;
 
                 case "new_player":
                     console.info("Info: New player message", message);
-                    players.push(message.player);
+                    players[message.peer_name] = message.player;
                     break;
 
-                case "player_disconnect":
+                case "player_disconnected":
                     console.info("Info: Player disconnect message", message);
-                    players = players.filter((player) => player.id !== message.player_id);
+                    delete players[message.peer_name];
                     break;
 
-                case "update":
-
+                case "player_update":
+                    console.info("Info: Player update message", message);
+                    players[message.peer_name] = message.player;
                     break;
 
                 default:
                     console.warn("Warn: Unknown message type", message);
             }
+
+            console.log("Info: Players", players);
         }
 
         console.info("Info: Game initialized");

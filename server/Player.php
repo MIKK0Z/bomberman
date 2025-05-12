@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . "/Tile.php";
-
 class Player implements JsonSerializable {
     /** @var resource stram socket */
     private $client;
@@ -50,6 +48,22 @@ class Player implements JsonSerializable {
      */
     public function getClient() {
         return $this->client;
+    }
+
+    /**
+     * Get the client sockets of all players except this one.
+     * 
+     * @param array<Player> $players An array of Player objects.
+     * @return array<resource> An array of client sockets that are not this player.
+     */
+    public function getOtherClients(array $players): array {
+        $other_clients = array();
+        foreach ($players as $player) {
+            if ($player->getPeerName() !== $this->peerName) {
+                array_push($other_clients, $player->getClient());
+            }
+        }
+        return $other_clients;
     }
 
     public function getPeerName(): string {
