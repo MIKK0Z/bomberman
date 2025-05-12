@@ -54,6 +54,18 @@ type ServerPlayer = {
     vel_y: number;
 }
 
+type ServerBalloon = {
+    pos_x: number;
+    pos_y: number;
+    vel_x: number;
+    vel_y: number;
+
+    // TODO: Add balloon specific properties
+    // going_from:
+    // going_to:
+    // ? progress:
+};
+
 type PlayerDirection = "left" | "right" | "up" | "down";
 type PlayerActualAnimationName = Exclude<keyof AnimationsData["player"], "duration">;
 
@@ -66,13 +78,15 @@ type Player = ServerPlayer & {
 
 type GameMap = Array<Array<Tile>>;
 type ServerMessage =
-    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: ServerPlayer }, player_speed: number, peer_name: string }
+    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: ServerPlayer }, ballons: ServerBalloon[], player_speed: number, peer_name: string }
     | { type: "new_player"; peer_name: string, player: ServerPlayer }
     | { type: "player_disconnected"; peer_name: string }
     | { type: "player_update", peer_name: string, player: ServerPlayer }
+    | { type: "game_update", ballons: Array<ServerBalloon> } // Add ballons to game_update
 
 let players: { [key: string]: Player } = {};
 let map: GameMap = [];
+let balloons: Array<ServerBalloon> = []; // Array to store balloon data
 let player_speed = 1;
 
 function isWallAt(tile_x: number, tile_y: number, map: GameMap): boolean {
@@ -211,6 +225,10 @@ const gameLoop = () => {
             }
         }
     }
+
+    // for (const balloon of balloons) {
+    //     sprite_sheet.drawSprite(ctx, 0, 3, balloon.pos_x * TILE_SIZE, balloon.pos_y * TILE_SIZE);
+    // }
 
     for (const [_peer_name, player] of Object.entries(players)) {
         const dx = player.vel_x * player_speed * deltaTime;
@@ -359,6 +377,7 @@ const initGame = async () => {
                         clientPlayers[pName] = addAnimationDefaults(message.players[pName]);
                     }
                     players = clientPlayers;
+                    balloons = message.ballons;
                     player_speed = message.player_speed;
                     peer_name = message.peer_name;
                     break;
@@ -390,11 +409,13 @@ const initGame = async () => {
                     }
                     break;
 
+                case "game_update":
+                    console.info("Info: Game update message", message);
+                    break;
+
                 default:
                     console.warn("Warn: Unknown message type", message);
             }
-
-            console.log("Info: Players", players);
         }
 
         console.info("Info: Game initialized");
