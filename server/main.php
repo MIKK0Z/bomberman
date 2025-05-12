@@ -8,7 +8,7 @@ ini_set("memory_limit", "512M");
 // Define constants first
 const GAME_WIDTH = 31;
 const GAME_HEIGHT = 13;
-const BREAKABLE_WALL_DENSITY = 0.2; // chance of a breakable wall in a cell (0.0 - 1.0)
+const BREAKABLE_WALL_DENSITY = 0.1; // chance of a breakable wall in a cell (0.0 - 1.0)
 const BALLOON_COUNT = 5;
 const TICK_LENGTH = 1; // seconds
 const PLAYER_SPEED = 5;
@@ -27,7 +27,6 @@ $players = array();
 $map = array();
 
 generate_map($map);
-
 
 printf("Starting server...\n");
 $server = stream_socket_server(
@@ -116,7 +115,7 @@ while (true) {
         while (strlen($current_player->getSocketBuffer()) > 0) {
             $bytes_consumed_this_frame = 0;
 
-            $decoded_result = ws_decode_message_from_buffer($current_player, $bytes_consumed_this_frame);
+            $decoded_result = ws_decode($current_player, $bytes_consumed_this_frame);
 
             if ($bytes_consumed_this_frame > 0) {
                 $current_player->consumeFromSocketBuffer($bytes_consumed_this_frame);

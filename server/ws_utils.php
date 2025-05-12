@@ -9,7 +9,7 @@ declare(strict_types=1);
  * @param int &$bytes_consumed Output parameter for the number of bytes consumed from the buffer.
  * @return string|WebSocketDecodeError The decoded payload or an error enum.
  */
-function ws_decode_message_from_buffer(Player $player, int &$bytes_consumed): string | WebSocketDecodeError {
+function ws_decode(Player $player, int &$bytes_consumed): string | WebSocketDecodeError {
     $data = $player->getSocketBuffer();
     $bytes_consumed = 0;
 

@@ -1,9 +1,9 @@
-"use strict";
-
 import "modern-normalize/modern-normalize.css";
 
 import "./style.css";
+
 import sprite_sheet_src from "./assets/sprite_sheet.png"
+import animations_data_json from "./data/animations.json";
 
 const SPRITE_SIZE = 16;
 const TILE_SIZE = 32;
@@ -26,28 +26,72 @@ app.appendChild(canvas);
 let lastFrameTime = performance.now();
 let peer_name: string | null = null;
 
+type AnimationFrameCoord = { x: number; y: number };
+type AnimationSequence = Array<AnimationFrameCoord>;
+interface AnimationsData {
+    player: {
+        frame_length: number;
+        left: AnimationSequence;
+        down: AnimationSequence;
+        right: AnimationSequence;
+        up: AnimationSequence;
+        death: AnimationSequence;
+    };
+}
+
+const animations_data: AnimationsData = animations_data_json;
+
 enum Tile {
     Wall = 0,
     BreakableWall = 1,
     Grass = 2,
 }
 
-type Player = {
+type ServerPlayer = {
     pos_x: number;
     pos_y: number;
     vel_x: number;
     vel_y: number;
 }
+
+type PlayerDirection = "left" | "right" | "up" | "down";
+type PlayerActualAnimationName = Exclude<keyof AnimationsData["player"], "duration">;
+
+type Player = ServerPlayer & {
+    currentAnimationName: PlayerActualAnimationName;
+    animationFrame: number;
+    animationTimer: number;
+    lastDirection: PlayerDirection;
+};
+
 type GameMap = Array<Array<Tile>>;
 type ServerMessage =
-    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: Player }, player_speed: number, peer_name: string }
-    | { type: "new_player"; peer_name: string, player: Player }
+    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: ServerPlayer }, player_speed: number, peer_name: string }
+    | { type: "new_player"; peer_name: string, player: ServerPlayer }
     | { type: "player_disconnected"; peer_name: string }
-    | { type: "player_update", peer_name: string, player: Player }
+    | { type: "player_update", peer_name: string, player: ServerPlayer }
 
 let players: { [key: string]: Player } = {};
 let map: GameMap = [];
 let player_speed = 1;
+
+function isWallAt(tile_x: number, tile_y: number, map: GameMap): boolean {
+    if (!map || map.length === 0 || !map[0] || map[0].length === 0) return true;
+    if (tile_x < 0 || tile_x >= map[0].length || tile_y < 0 || tile_y >= map.length) return true;
+
+    const tile = map[tile_y][tile_x];
+    return tile === Tile.Wall || tile === Tile.BreakableWall;
+}
+
+function addAnimationDefaults(serverPlayer: ServerPlayer): Player {
+    return {
+        ...serverPlayer,
+        currentAnimationName: "down",
+        animationFrame: 0,
+        animationTimer: 0,
+        lastDirection: "down",
+    };
+}
 
 class SpriteSheet {
     private readonly sprite_sheet_src: string;
@@ -146,7 +190,7 @@ const gameLoop = () => {
     }
 
     const currentTime = performance.now();
-    const deltaTime = (currentTime - lastFrameTime) / 1000; // Convert to seconds
+    const deltaTime = (currentTime - lastFrameTime) / 1000;
     lastFrameTime = currentTime;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -169,16 +213,104 @@ const gameLoop = () => {
     }
 
     for (const [_peer_name, player] of Object.entries(players)) {
-        player.pos_x += player.vel_x * player_speed * deltaTime;
-        player.pos_y += player.vel_y * player_speed * deltaTime;
+        const dx = player.vel_x * player_speed * deltaTime;
+        const dy = player.vel_y * player_speed * deltaTime;
 
-        sprite_sheet.drawSprite(ctx, 0, 0, player.pos_x * TILE_SIZE, player.pos_y * TILE_SIZE);
+        let next_player_pos_x = player.pos_x + dx;
+        if (dx > 0) {
+            const y1_check = Math.floor(player.pos_y + 0.05);
+            const y2_check = Math.floor(player.pos_y + 1 - 0.05);
+            const collision_tile_x = Math.floor(next_player_pos_x + 1);
+
+            if (isWallAt(collision_tile_x, y1_check, map) || isWallAt(collision_tile_x, y2_check, map)) {
+                player.pos_x = collision_tile_x - 1;
+            } else {
+                player.pos_x = next_player_pos_x;
+            }
+        } else if (dx < 0) {
+            const y1_check = Math.floor(player.pos_y + 0.05);
+            const y2_check = Math.floor(player.pos_y + 1 - 0.05);
+            const collision_tile_x = Math.floor(next_player_pos_x);
+
+            if (isWallAt(collision_tile_x, y1_check, map) || isWallAt(collision_tile_x, y2_check, map)) {
+                player.pos_x = collision_tile_x + 1;
+            } else {
+                player.pos_x = next_player_pos_x;
+            }
+        }
+
+        let next_player_pos_y = player.pos_y + dy;
+        if (dy > 0) {
+            const x1_check = Math.floor(player.pos_x + 0.05);
+            const x2_check = Math.floor(player.pos_x + 1 - 0.05);
+            const collision_tile_y = Math.floor(next_player_pos_y + 1);
+
+            if (isWallAt(x1_check, collision_tile_y, map) || isWallAt(x2_check, collision_tile_y, map)) {
+                player.pos_y = collision_tile_y - 1;
+            } else {
+                player.pos_y = next_player_pos_y;
+            }
+        } else if (dy < 0) {
+            const x1_check = Math.floor(player.pos_x + 0.05);
+            const x2_check = Math.floor(player.pos_x + 1 - 0.05);
+            const collision_tile_y = Math.floor(next_player_pos_y);
+
+            if (isWallAt(x1_check, collision_tile_y, map) || isWallAt(x2_check, collision_tile_y, map)) {
+                player.pos_y = collision_tile_y + 1;
+            } else {
+                player.pos_y = next_player_pos_y;
+            }
+        }
+
+        let newAnimationRequired = false;
+        let targetAnimationName: PlayerActualAnimationName = player.currentAnimationName;
+        let newLastDirection: PlayerDirection = player.lastDirection;
+
+        if (player.vel_x < 0) {
+            targetAnimationName = "left";
+            newLastDirection = "left";
+        } else if (player.vel_x > 0) {
+            targetAnimationName = "right";
+            newLastDirection = "right";
+        } else if (player.vel_y < 0) {
+            targetAnimationName = "up";
+            newLastDirection = "up";
+        } else if (player.vel_y > 0) {
+            targetAnimationName = "down";
+            newLastDirection = "down";
+        } else {
+            targetAnimationName = player.lastDirection;
+        }
+
+        if (player.currentAnimationName !== targetAnimationName || player.lastDirection !== newLastDirection) {
+            newAnimationRequired = true;
+            player.currentAnimationName = targetAnimationName;
+            player.animationFrame = 0;
+            player.animationTimer = 0;
+        }
+        player.lastDirection = newLastDirection;
+
+        player.animationTimer += deltaTime;
+
+        const animationSequence = animations_data.player[player.currentAnimationName];
+        const numFrames = animationSequence.length;
+        const frameLength = animations_data.player.frame_length;
+
+        if (player.vel_x !== 0 || player.vel_y !== 0) {
+            if (player.animationTimer >= frameLength) {
+                player.animationFrame = (player.animationFrame + 1) % numFrames;
+                player.animationTimer %= frameLength;
+            }
+        } else {
+            player.animationFrame = 0;
+        }
+
+        const spriteCoord = animationSequence[player.animationFrame];
+        sprite_sheet.drawSprite(ctx, spriteCoord.x, spriteCoord.y, player.pos_x * TILE_SIZE, player.pos_y * TILE_SIZE);
     }
-
 
     requestAnimationFrame(gameLoop);
 }
-
 
 const initGame = async () => {
     console.info("Info: Initializing game...");
@@ -221,14 +353,19 @@ const initGame = async () => {
                     canvas.width = message.map_width * TILE_SIZE;
                     canvas.height = message.map_height * TILE_SIZE;
                     map = message.map;
-                    players = message.players;
+
+                    const clientPlayers: { [key: string]: Player } = {};
+                    for (const pName in message.players) {
+                        clientPlayers[pName] = addAnimationDefaults(message.players[pName]);
+                    }
+                    players = clientPlayers;
                     player_speed = message.player_speed;
                     peer_name = message.peer_name;
                     break;
 
                 case "new_player":
                     console.info("Info: New player message", message);
-                    players[message.peer_name] = message.player;
+                    players[message.peer_name] = addAnimationDefaults(message.player);
                     break;
 
                 case "player_disconnected":
@@ -238,7 +375,19 @@ const initGame = async () => {
 
                 case "player_update":
                     console.info("Info: Player update message", message);
-                    players[message.peer_name] = message.player;
+                    const playerToUpdate = players[message.peer_name];
+                    if (playerToUpdate) {
+                        // Update core properties from server
+                        playerToUpdate.pos_x = message.player.pos_x;
+                        playerToUpdate.pos_y = message.player.pos_y;
+                        playerToUpdate.vel_x = message.player.vel_x;
+                        playerToUpdate.vel_y = message.player.vel_y;
+                        // Animation properties (currentAnimationName, animationFrame, animationTimer, lastDirection)
+                        // are managed client-side and will be updated by the gameLoop based on new vel_x/vel_y.
+                    } else {
+                        // Player doesn't exist locally, augment and add (should ideally be handled by "new_player")
+                        players[message.peer_name] = addAnimationDefaults(message.player);
+                    }
                     break;
 
                 default:
