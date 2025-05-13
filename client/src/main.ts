@@ -62,15 +62,10 @@ type ServerPlayer = {
 }
 
 type ServerBalloon = {
-    pos_x: number;
-    pos_y: number;
-    vel_x: number;
-    vel_y: number;
-
-    // TODO: Add balloon specific properties
-    // going_from:
-    // going_to:
-    // ? progress:
+    from_x: number;
+    from_y: number;
+    to_x: number;
+    to_y: number;
 };
 
 type PlayerDirection = "left" | "right" | "up" | "down";
@@ -234,7 +229,11 @@ const gameLoop = () => {
     }
 
     balloons.forEach((ballon) => {
-        sprite_sheet!.drawSprite(ctx, animations_data.ballon.up[0].x, animations_data.ballon.up[0].y, ballon.pos_x * TILE_SIZE, ballon.pos_y * TILE_SIZE);
+        if (!sprite_sheet) {
+            console.error("Error: SpriteSheet not initialized");
+            return;
+        };
+        sprite_sheet.drawSprite(ctx, 1, 1, ballon.from_x * TILE_SIZE, ballon.from_y * TILE_SIZE);
     })
 
 
@@ -360,7 +359,7 @@ const initGame = async () => {
         await sprite_sheet.init();
         await initWebSocket();
 
-        if (!ws) return; // Should never happen
+        if (!ws) return;
 
         ws.onerror = (error) => {
             console.error("Error: WebSocket error", error);
@@ -402,21 +401,16 @@ const initGame = async () => {
                     console.info("Info: Player update message", message);
                     const playerToUpdate = players[message.peer_name];
                     if (playerToUpdate) {
-                        // Update core properties from server
                         playerToUpdate.pos_x = message.player.pos_x;
                         playerToUpdate.pos_y = message.player.pos_y;
                         playerToUpdate.vel_x = message.player.vel_x;
                         playerToUpdate.vel_y = message.player.vel_y;
-                        // Animation properties (currentAnimationName, animationFrame, animationTimer, lastDirection)
-                        // are managed client-side and will be updated by the gameLoop based on new vel_x/vel_y.
-                    } else {
-                        // Player doesn't exist locally, augment and add (should ideally be handled by "new_player")
-                        players[message.peer_name] = addAnimationDefaults(message.player);
                     }
                     break;
 
                 case "game_update":
                     console.info("Info: Game update message", message);
+                    balloons = message.ballons;
                     break;
 
                 default:

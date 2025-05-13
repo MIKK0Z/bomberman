@@ -9,7 +9,7 @@ const GAME_WIDTH = 31;
 const GAME_HEIGHT = 13;
 const BREAKABLE_WALL_DENSITY = 0.1; // chance of a breakable wall in a cell (0.0 - 1.0)
 const BALLOON_COUNT = 5;
-const TICK_LENGTH = 1; // seconds
+const TICK_LENGTH = 0.5; // seconds
 const PLAYER_SPEED = 5;
 const STREAM_SELECT_TIMEOUT_SEC = 0;
 const STREAM_SELECT_TIMEOUT_USEC = 1000;
@@ -235,45 +235,55 @@ while (true) {
     $game_tick_accumulator += $delta_time;
 
     while ($game_tick_accumulator >= TICK_LENGTH) {
-        // Move balloons
-        // foreach ($ballons as $ballon) {
-        //     $new_pos_x = $ballon->getPosX() + $ballon->getVelX();
-        //     $new_pos_y = $ballon->getPosY() + $ballon->getVelY();
+        // Move ballons and determine their next target
+        foreach ($ballons as $ballon) {
+            // 1. Move ballon to its current target destination for this tick
+            $ballon->setFromX($ballon->getToX());
+            $ballon->setFromY($ballon->getToY());
 
-        //     // Basic boundary and collision detection (simplified)
-        //     // Check map boundaries
-        //     if ($new_pos_x < 0 || $new_pos_x >= GAME_WIDTH || $map[(int)round($ballon->getPosY())][(int)round($new_pos_x)] === Tile::Wall || $map[(int)round($ballon->getPosY())][(int)round($new_pos_x)] === Tile::BreakableWall) {
-        //         $ballon->setVelX($ballon->getVelX() * -1); // Reverse X velocity
-        //         // Adjust position to be just before the wall if it would have passed through
-        //         $new_pos_x = $ballon->getPosX();
-        //     } else {
-        //         $ballon->setPosX($new_pos_x);
-        //     }
+            // 2. Ballon has reached its destination, find a new target for the next tick
+            $current_x = $ballon->getFromX();
+            $current_y = $ballon->getFromY();
 
-        //     if ($new_pos_y < 0 || $new_pos_y >= GAME_HEIGHT || $map[(int)round($new_pos_y)][(int)round($ballon->getPosX())] === Tile::Wall || $map[(int)round($new_pos_y)][(int)round($ballon->getPosX())] === Tile::BreakableWall) {
-        //         $ballon->setVelY($ballon->getVelY() * -1); // Reverse Y velocity
-        //         // Adjust position to be just before the wall
-        //         $new_pos_y = $ballon->getPosY();
-        //     } else {
-        //         $ballon->setPosY($new_pos_y);
-        //     }
+            $new_target_determined = false;
+            do {
+                $adjacent_grass_tiles = array();
+                $potential_neighbors = array(
+                    array("y" => $current_y - 1, "x" => $current_x), // Up
+                    array("y" => $current_y + 1, "x" => $current_x), // Down
+                    array("y" => $current_y, "x" => $current_x - 1), // Left
+                    array("y" => $current_y, "x" => $current_x + 1), // Right
+                );
 
-        //     // Ensure balloons don't get stuck by alternating direction if both velocities become 0 after hitting corners
-        //     if ($ballon->getVelX() === 0 && $ballon->getVelY() === 0) {
-        //         // This logic might need to be more sophisticated to prevent getting stuck
-        //         // For now, just give it a new random direction
-        //         $ballon->setVelX(rand(0, 1) * 2 - 1);
-        //         $ballon->setVelY((rand(0, 1) === 0) ? (rand(0, 1) * 2 - 1) : 0);
-        //         if ($ballon->getVelX() !== 0 && $ballon->getVelY() !== 0) {
-        //             if (rand(0, 1) === 0) $ballon->setVelX(0);
-        //             else $ballon->setVelY(0);
-        //         }
-        //         if ($ballon->getVelX() === 0 && $ballon->getVelY() === 0) $ballon->setVelX(1);
-        //     }
-        // }
+                foreach ($potential_neighbors as $neighbor) {
+                    $nx = $neighbor["x"];
+                    $ny = $neighbor["y"];
 
-        // TODO: Add other game logic updates here that should run once per TICK_LENGTH
-        // For example: move NPCs, update environment, check game conditions.
+                    // Check bounds and if the tile is grass
+                    if (
+                        $nx >= 0 && $nx < GAME_WIDTH &&
+                        $ny >= 0 && $ny < GAME_HEIGHT &&
+                        isset($map[$ny][$nx]) && $map[$ny][$nx] === Tile::Grass
+                    ) {
+                        array_push($adjacent_grass_tiles, $neighbor);
+                    }
+                }
+
+                if (!empty($adjacent_grass_tiles)) {
+                    $random_neighbor_key = array_rand($adjacent_grass_tiles);
+                    $chosen_neighbor = $adjacent_grass_tiles[$random_neighbor_key];
+                    $ballon->setToX($chosen_neighbor["x"]);
+                    $ballon->setToY($chosen_neighbor["y"]);
+                } else {
+                    // If no valid move (e.g., ballon is trapped),
+                    // set its next target to its current position.
+                    // It will effectively stay put and re-evaluate in the next tick.
+                    $ballon->setToX($current_x);
+                    $ballon->setToY($current_y);
+                }
+                $new_target_determined = true; // A target is always determined in this pass
+            } while (!$new_target_determined);
+        }
 
         ws_send(
             json_encode(array(
