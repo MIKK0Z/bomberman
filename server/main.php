@@ -12,7 +12,7 @@ const BALLOON_COUNT = 5;
 const TICK_LENGTH = 1; // seconds
 const PLAYER_SPEED = 5;
 const STREAM_SELECT_TIMEOUT_SEC = 0;
-const STREAM_SELECT_TIMEOUT_USEC = 1;
+const STREAM_SELECT_TIMEOUT_USEC = 1000;
 
 require_once __DIR__ . "/env.php";
 require_once __DIR__ . "/ws_utils.php";
@@ -33,24 +33,46 @@ $map = array();
 
 generate_map($map);
 
-// Initialize balloons
 for ($i = 0; $i < BALLOON_COUNT; $i++) {
     $start_x = 0;
     $start_y = 0;
+    $to_x = 0;
+    $to_y = 0;
+    $valid_spawn = false;
     do {
         $start_x = rand(1, GAME_WIDTH - 2);
         $start_y = rand(1, GAME_HEIGHT - 2);
-    } while ($map[$start_y][$start_x] !== Tile::Grass);
 
-    // $vel_x = rand(0, 1) * 2 - 1;
-    // $vel_y = (rand(0, 1) === 0) ? (rand(0, 1) * 2 - 1) : 0;
-    // if ($vel_x !== 0 && $vel_y !== 0) {
-    //     if (rand(0, 1) === 0) $vel_x = 0;
-    //     else $vel_y = 0;
-    // }
-    // if ($vel_x === 0 && $vel_y === 0) $vel_x = 1; // Ensure it moves
+        if ($map[$start_y][$start_x] === Tile::Grass) {
+            $adjacent_grass_tiles = array();
+            $potential_neighbors = array(
+                array("y" => $start_y - 1, "x" => $start_x),
+                array("y" => $start_y + 1, "x" => $start_x),
+                array("y" => $start_y, "x" => $start_x - 1),
+                array("y" => $start_y, "x" => $start_x + 1),
+            );
 
-    // $ballons[] = new Ballon((float)$start_x, (float)$start_y, $vel_x, $vel_y);
+            foreach ($potential_neighbors as $neighbor) {
+                $nx = $neighbor["x"];
+                $ny = $neighbor["y"];
+
+                if ($nx >= 0 && $nx < GAME_WIDTH && $ny >= 0 && $ny < GAME_HEIGHT) {
+                    if ($map[$ny][$nx] === Tile::Grass) {
+                        array_push($adjacent_grass_tiles, $neighbor);
+                    }
+                }
+            }
+            if (!empty($adjacent_grass_tiles)) {
+                $valid_spawn = true;
+                $random_neighbor_key = array_rand($adjacent_grass_tiles);
+                $chosen_neighbor = $adjacent_grass_tiles[$random_neighbor_key];
+                $to_x = $chosen_neighbor["x"];
+                $to_y = $chosen_neighbor["y"];
+            }
+        }
+    } while (!$valid_spawn);
+
+    array_push($ballons, new Ballon($start_x, $start_y, $to_x, $to_y));
 }
 
 printf("Starting server...\n");
@@ -69,7 +91,7 @@ if (!$server) {
 printf("Server started on %s:%s\n", HOST, PORT);
 
 $prev_time = microtime(true);
-$game_tick_accumulator = 0.0; // Accumulator for game tick timing
+$game_tick_accumulator = 0.0;
 
 while (true) {
     $changed = array($server);
@@ -213,44 +235,42 @@ while (true) {
     $game_tick_accumulator += $delta_time;
 
     while ($game_tick_accumulator >= TICK_LENGTH) {
-        printf("Game Tick: Executing %f-second interval logic.\n", (float)TICK_LENGTH);
-
         // Move balloons
-        foreach ($ballons as $ballon) {
-            $new_pos_x = $ballon->getPosX() + $ballon->getVelX();
-            $new_pos_y = $ballon->getPosY() + $ballon->getVelY();
+        // foreach ($ballons as $ballon) {
+        //     $new_pos_x = $ballon->getPosX() + $ballon->getVelX();
+        //     $new_pos_y = $ballon->getPosY() + $ballon->getVelY();
 
-            // Basic boundary and collision detection (simplified)
-            // Check map boundaries
-            if ($new_pos_x < 0 || $new_pos_x >= GAME_WIDTH || $map[(int)round($ballon->getPosY())][(int)round($new_pos_x)] === Tile::Wall || $map[(int)round($ballon->getPosY())][(int)round($new_pos_x)] === Tile::BreakableWall) {
-                $ballon->setVelX($ballon->getVelX() * -1); // Reverse X velocity
-                // Adjust position to be just before the wall if it would have passed through
-                $new_pos_x = $ballon->getPosX();
-            } else {
-                $ballon->setPosX($new_pos_x);
-            }
+        //     // Basic boundary and collision detection (simplified)
+        //     // Check map boundaries
+        //     if ($new_pos_x < 0 || $new_pos_x >= GAME_WIDTH || $map[(int)round($ballon->getPosY())][(int)round($new_pos_x)] === Tile::Wall || $map[(int)round($ballon->getPosY())][(int)round($new_pos_x)] === Tile::BreakableWall) {
+        //         $ballon->setVelX($ballon->getVelX() * -1); // Reverse X velocity
+        //         // Adjust position to be just before the wall if it would have passed through
+        //         $new_pos_x = $ballon->getPosX();
+        //     } else {
+        //         $ballon->setPosX($new_pos_x);
+        //     }
 
-            if ($new_pos_y < 0 || $new_pos_y >= GAME_HEIGHT || $map[(int)round($new_pos_y)][(int)round($ballon->getPosX())] === Tile::Wall || $map[(int)round($new_pos_y)][(int)round($ballon->getPosX())] === Tile::BreakableWall) {
-                $ballon->setVelY($ballon->getVelY() * -1); // Reverse Y velocity
-                // Adjust position to be just before the wall
-                $new_pos_y = $ballon->getPosY();
-            } else {
-                $ballon->setPosY($new_pos_y);
-            }
+        //     if ($new_pos_y < 0 || $new_pos_y >= GAME_HEIGHT || $map[(int)round($new_pos_y)][(int)round($ballon->getPosX())] === Tile::Wall || $map[(int)round($new_pos_y)][(int)round($ballon->getPosX())] === Tile::BreakableWall) {
+        //         $ballon->setVelY($ballon->getVelY() * -1); // Reverse Y velocity
+        //         // Adjust position to be just before the wall
+        //         $new_pos_y = $ballon->getPosY();
+        //     } else {
+        //         $ballon->setPosY($new_pos_y);
+        //     }
 
-            // Ensure balloons don't get stuck by alternating direction if both velocities become 0 after hitting corners
-            if ($ballon->getVelX() === 0 && $ballon->getVelY() === 0) {
-                // This logic might need to be more sophisticated to prevent getting stuck
-                // For now, just give it a new random direction
-                $ballon->setVelX(rand(0, 1) * 2 - 1);
-                $ballon->setVelY((rand(0, 1) === 0) ? (rand(0, 1) * 2 - 1) : 0);
-                if ($ballon->getVelX() !== 0 && $ballon->getVelY() !== 0) {
-                    if (rand(0, 1) === 0) $ballon->setVelX(0);
-                    else $ballon->setVelY(0);
-                }
-                if ($ballon->getVelX() === 0 && $ballon->getVelY() === 0) $ballon->setVelX(1);
-            }
-        }
+        //     // Ensure balloons don't get stuck by alternating direction if both velocities become 0 after hitting corners
+        //     if ($ballon->getVelX() === 0 && $ballon->getVelY() === 0) {
+        //         // This logic might need to be more sophisticated to prevent getting stuck
+        //         // For now, just give it a new random direction
+        //         $ballon->setVelX(rand(0, 1) * 2 - 1);
+        //         $ballon->setVelY((rand(0, 1) === 0) ? (rand(0, 1) * 2 - 1) : 0);
+        //         if ($ballon->getVelX() !== 0 && $ballon->getVelY() !== 0) {
+        //             if (rand(0, 1) === 0) $ballon->setVelX(0);
+        //             else $ballon->setVelY(0);
+        //         }
+        //         if ($ballon->getVelX() === 0 && $ballon->getVelY() === 0) $ballon->setVelX(1);
+        //     }
+        // }
 
         // TODO: Add other game logic updates here that should run once per TICK_LENGTH
         // For example: move NPCs, update environment, check game conditions.
@@ -263,7 +283,6 @@ while (true) {
             )),
             get_clients($players)
         );
-        printf("Current seconds: %s\n", date("s"));
 
 
 

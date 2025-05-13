@@ -3,57 +3,57 @@
 declare(strict_types=1);
 
 class Ballon implements JsonSerializable {
-    private float $pos_x;
-    private float $pos_y;
+    private int $from_x;
+    private int $from_y;
 
-    private int $vel_x;
-    private int $vel_y;
+    private int $to_x;
+    private int $to_y;
 
-    public function __construct(float $pos_x, float $pos_y, int $vel_x, int $vel_y) {
-        $this->pos_x = $pos_x;
-        $this->pos_y = $pos_y;
-        $this->vel_x = $vel_x;
-        $this->vel_y = $vel_y;
+    public function __construct(int $from_x, int $from_y, int $to_x, int $to_y) {
+        $this->from_x = $from_x;
+        $this->from_y = $from_y;
+        $this->to_x = $to_x;
+        $this->to_y = $to_y;
     }
 
-    public function getPosX(): float {
-        return $this->pos_x;
+    public function getFromX(): int {
+        return $this->from_x;
     }
 
-    public function getPosY(): float {
-        return $this->pos_y;
+    public function getFromY(): int {
+        return $this->from_y;
     }
 
-    public function getVelX(): int {
-        return $this->vel_x;
+    public function getToX(): int {
+        return $this->to_x;
     }
 
-    public function getVelY(): int {
-        return $this->vel_y;
+    public function getToY(): int {
+        return $this->to_y;
     }
 
-    public function setPosX(float $pos_x): void {
-        $this->pos_x = $pos_x;
+    public function setFromX(int $from_x): void {
+        $this->from_x = $from_x;
     }
 
-    public function setPosY(float $pos_y): void {
-        $this->pos_y = $pos_y;
+    public function setFromY(int $from_y): void {
+        $this->from_y = $from_y;
     }
 
-    public function setVelX(int $vel_x): void {
-        $this->vel_x = $vel_x;
+    public function setToX(int $to_x): void {
+        $this->to_x = $to_x;
     }
 
-    public function setVelY(int $vel_y): void {
-        $this->vel_y = $vel_y;
+    public function setToY(int $to_y): void {
+        $this->to_y = $to_y;
     }
 
     public function jsonSerialize(): array {
         return array(
-            "pos_x" => $this->pos_x,
-            "pos_y" => $this->pos_y,
-            "vel_x" => $this->vel_x,
-            "vel_y" => $this->vel_y,
+            "from_x" => $this->from_x,
+            "from_y" => $this->from_y,
+            "to_x" => $this->to_x,
+            "to_y" => $this->to_y,
         );
     }
 }

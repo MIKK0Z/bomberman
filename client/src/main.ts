@@ -28,7 +28,7 @@ let peer_name: string | null = null;
 
 type AnimationFrameCoord = { x: number; y: number };
 type AnimationSequence = Array<AnimationFrameCoord>;
-interface AnimationsData {
+type AnimationsData = {
     player: {
         frame_length: number;
         left: AnimationSequence;
@@ -36,7 +36,14 @@ interface AnimationsData {
         right: AnimationSequence;
         up: AnimationSequence;
         death: AnimationSequence;
-    };
+    }
+    ballon: {
+        frame_length: number;
+        left: AnimationSequence;
+        down: AnimationSequence;
+        right: AnimationSequence;
+        up: AnimationSequence;
+    }
 }
 
 const animations_data: AnimationsData = animations_data_json;
@@ -82,11 +89,11 @@ type ServerMessage =
     | { type: "new_player"; peer_name: string, player: ServerPlayer }
     | { type: "player_disconnected"; peer_name: string }
     | { type: "player_update", peer_name: string, player: ServerPlayer }
-    | { type: "game_update", ballons: Array<ServerBalloon> } // Add ballons to game_update
+    | { type: "game_update", ballons: Array<ServerBalloon> }
 
 let players: { [key: string]: Player } = {};
 let map: GameMap = [];
-let balloons: Array<ServerBalloon> = []; // Array to store balloon data
+let balloons: Array<ServerBalloon> = [];
 let player_speed = 1;
 
 function isWallAt(tile_x: number, tile_y: number, map: GameMap): boolean {
@@ -226,9 +233,10 @@ const gameLoop = () => {
         }
     }
 
-    // for (const balloon of balloons) {
-    //     sprite_sheet.drawSprite(ctx, 0, 3, balloon.pos_x * TILE_SIZE, balloon.pos_y * TILE_SIZE);
-    // }
+    balloons.forEach((ballon) => {
+        sprite_sheet!.drawSprite(ctx, animations_data.ballon.up[0].x, animations_data.ballon.up[0].y, ballon.pos_x * TILE_SIZE, ballon.pos_y * TILE_SIZE);
+    })
+
 
     for (const [_peer_name, player] of Object.entries(players)) {
         const dx = player.vel_x * player_speed * deltaTime;
@@ -280,7 +288,6 @@ const gameLoop = () => {
             }
         }
 
-        let newAnimationRequired = false;
         let targetAnimationName: PlayerActualAnimationName = player.currentAnimationName;
         let newLastDirection: PlayerDirection = player.lastDirection;
 
@@ -301,7 +308,6 @@ const gameLoop = () => {
         }
 
         if (player.currentAnimationName !== targetAnimationName || player.lastDirection !== newLastDirection) {
-            newAnimationRequired = true;
             player.currentAnimationName = targetAnimationName;
             player.animationFrame = 0;
             player.animationTimer = 0;
