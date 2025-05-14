@@ -468,9 +468,8 @@ const initGame = async () => {
                     canvas.height = message.map_height * TILE_SIZE;
                     map = message.map;
 
-                    // IMPORTANT: Set tick_length and other parameters BEFORE initializing entities that depend on them.
                     player_speed = message.player_speed;
-                    tick_length = message.tick_length; // Set tick_length here
+                    tick_length = message.tick_length;
                     peer_name = message.peer_name;
 
                     const clientPlayers: { [key: string]: Player } = {};
@@ -479,8 +478,6 @@ const initGame = async () => {
                     }
                     players = clientPlayers;
 
-                    // Now addBalloonAnimationDefaults can use the up-to-date global tick_length
-                    // and message.accumulated_time to correctly set initial state.
                     balloons = message.ballons.map((ballon) => addBalloonAnimationDefaults(ballon, message.accumulated_time));
                     break;
 
@@ -507,9 +504,7 @@ const initGame = async () => {
 
                 case "game_update":
                     console.info("Info: Game update message", message);
-                    // For game_update, balloons are reset for a new movement segment.
-                    // addBalloonAnimationDefaults is called with no offset, so timers and positions reset to start.
-                    balloons = message.ballons.map(b => addBalloonAnimationDefaults(b));
+                    balloons = message.ballons.map(ballon => addBalloonAnimationDefaults(ballon));
                     break;
 
                 default:
