@@ -328,7 +328,7 @@ const gameLoop = () => {
     });
 
 
-    for (const [_peer_name, player] of Object.entries(players)) {
+    for (const [players_peer_name, player] of Object.entries(players)) {
         const dx = player.vel_x * player_speed * deltaTime;
         const dy = player.vel_y * player_speed * deltaTime;
 
@@ -378,6 +378,8 @@ const gameLoop = () => {
             }
         }
 
+
+
         let targetAnimationName: PlayerAnimationName = player.currentAnimationName;
         let newLastDirection: Direction = player.lastDirection;
 
@@ -395,6 +397,18 @@ const gameLoop = () => {
             newLastDirection = "down";
         } else {
             targetAnimationName = player.lastDirection;
+        }
+
+        for (const balloon of balloons) {
+            if (
+                player.pos_x < balloon.current_x + 1 &&
+                player.pos_x + 1 > balloon.current_x &&
+                player.pos_y < balloon.current_y + 1 &&
+                player.pos_y + 1 > balloon.current_y
+            ) {
+                console.log(`Player ${players_peer_name} collided with a balloon!`);
+                targetAnimationName = "death";
+            }
         }
 
         if (player.currentAnimationName !== targetAnimationName || player.lastDirection !== newLastDirection) {
