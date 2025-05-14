@@ -9,7 +9,7 @@ const GAME_WIDTH = 31;
 const GAME_HEIGHT = 13;
 const BREAKABLE_WALL_DENSITY = 0.1; // chance of a breakable wall in a cell (0.0 - 1.0)
 const BALLOON_COUNT = 5;
-const TICK_LENGTH = 0.5; // seconds
+const TICK_LENGTH = 1;
 const PLAYER_SPEED = 5;
 const STREAM_SELECT_TIMEOUT_SEC = 0;
 const STREAM_SELECT_TIMEOUT_USEC = 1000;
@@ -124,7 +124,9 @@ while (true) {
                 "map" => $map,
                 "players" => $players,
                 "ballons" => $ballons,
+                "accumulated_time" => $game_tick_accumulator,
                 "player_speed" => PLAYER_SPEED,
+                "tick_length" => TICK_LENGTH,
                 "peer_name" => $peer_name,
             )),
             $player->getClient()

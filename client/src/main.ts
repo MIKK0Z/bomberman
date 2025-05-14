@@ -26,6 +26,9 @@ app.appendChild(canvas);
 let lastFrameTime = performance.now();
 let peer_name: string | null = null;
 
+let player_speed = 1;
+let tick_length = 1;
+
 type AnimationFrameCoord = { x: number; y: number };
 type AnimationSequence = Array<AnimationFrameCoord>;
 type AnimationsData = {
@@ -54,12 +57,21 @@ enum Tile {
     Grass = 2,
 }
 
+type Direction = "left" | "right" | "up" | "down";
+
 type ServerPlayer = {
     pos_x: number;
     pos_y: number;
     vel_x: number;
     vel_y: number;
 }
+type PlayerAnimationName = Exclude<keyof AnimationsData["player"], "frame_length">;
+type Player = ServerPlayer & {
+    currentAnimationName: PlayerAnimationName;
+    animationFrame: number;
+    animationTimer: number;
+    lastDirection: Direction;
+};
 
 type ServerBalloon = {
     from_x: number;
@@ -67,20 +79,20 @@ type ServerBalloon = {
     to_x: number;
     to_y: number;
 };
+type BallonAnimationName = Exclude<keyof AnimationsData["ballon"], "frame_length">;
+type Balloon = ServerBalloon & {
+    current_x: number;
+    current_y: number;
+    interpolationTimer: number;
 
-type PlayerDirection = "left" | "right" | "up" | "down";
-type PlayerActualAnimationName = Exclude<keyof AnimationsData["player"], "duration">;
-
-type Player = ServerPlayer & {
-    currentAnimationName: PlayerActualAnimationName;
+    currentAnimationName: BallonAnimationName;
     animationFrame: number;
     animationTimer: number;
-    lastDirection: PlayerDirection;
 };
 
 type GameMap = Array<Array<Tile>>;
 type ServerMessage =
-    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: ServerPlayer }, ballons: ServerBalloon[], player_speed: number, peer_name: string }
+    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: ServerPlayer }, ballons: ServerBalloon[], accumulated_time: number, player_speed: number, tick_length: number, peer_name: string }
     | { type: "new_player"; peer_name: string, player: ServerPlayer }
     | { type: "player_disconnected"; peer_name: string }
     | { type: "player_update", peer_name: string, player: ServerPlayer }
@@ -88,8 +100,7 @@ type ServerMessage =
 
 let players: { [key: string]: Player } = {};
 let map: GameMap = [];
-let balloons: Array<ServerBalloon> = [];
-let player_speed = 1;
+let balloons: Array<Balloon> = [];
 
 function isWallAt(tile_x: number, tile_y: number, map: GameMap): boolean {
     if (!map || map.length === 0 || !map[0] || map[0].length === 0) return true;
@@ -99,13 +110,46 @@ function isWallAt(tile_x: number, tile_y: number, map: GameMap): boolean {
     return tile === Tile.Wall || tile === Tile.BreakableWall;
 }
 
-function addAnimationDefaults(serverPlayer: ServerPlayer): Player {
+function addPlayerAnimationDefaults(serverData: ServerPlayer): Player {
     return {
-        ...serverPlayer,
+        ...serverData,
         currentAnimationName: "down",
         animationFrame: 0,
         animationTimer: 0,
         lastDirection: "down",
+    };
+}
+
+function addBalloonAnimationDefaults(serverData: ServerBalloon, animation_start_offset_time: number = 0): Balloon {
+    let initialAnimationName: BallonAnimationName = "down";
+    const dx = serverData.to_x - serverData.from_x;
+    const dy = serverData.to_y - serverData.from_y;
+
+    if (dx < 0) initialAnimationName = "left";
+    else if (dx > 0) initialAnimationName = "right";
+    else if (dy < 0) initialAnimationName = "up";
+    else if (dy > 0) initialAnimationName = "down";
+
+    let initial_current_x = serverData.from_x;
+    let initial_current_y = serverData.from_y;
+    let initial_interpolation_timer = 0;
+
+    if (animation_start_offset_time > 0 && tick_length > 0) {
+        const t_initial = Math.min(animation_start_offset_time, tick_length) / tick_length;
+        initial_current_x = serverData.from_x + (serverData.to_x - serverData.from_x) * Math.min(t_initial, 1.0);
+        initial_current_y = serverData.from_y + (serverData.to_y - serverData.from_y) * Math.min(t_initial, 1.0);
+        initial_interpolation_timer = animation_start_offset_time;
+    }
+
+    return {
+        ...serverData,
+        current_x: initial_current_x,
+        current_y: initial_current_y,
+        interpolationTimer: initial_interpolation_timer,
+
+        currentAnimationName: initialAnimationName,
+        animationFrame: 0,
+        animationTimer: animation_start_offset_time,
     };
 }
 
@@ -233,8 +277,55 @@ const gameLoop = () => {
             console.error("Error: SpriteSheet not initialized");
             return;
         };
-        sprite_sheet.drawSprite(ctx, 1, 1, ballon.from_x * TILE_SIZE, ballon.from_y * TILE_SIZE);
-    })
+
+        ballon.interpolationTimer += deltaTime;
+        const currentSegmentTime = Math.min(ballon.interpolationTimer, tick_length);
+
+        let t = 0;
+        if (tick_length > 0) {
+            t = currentSegmentTime / tick_length;
+        }
+        t = Math.min(t, 1.0);
+
+        ballon.current_x = ballon.from_x + (ballon.to_x - ballon.from_x) * t;
+        ballon.current_y = ballon.from_y + (ballon.to_y - ballon.from_y) * t;
+
+        let targetAnimationName: BallonAnimationName = ballon.currentAnimationName;
+        const dx = ballon.to_x - ballon.from_x;
+        const dy = ballon.to_y - ballon.from_y;
+
+        if (dx < 0) targetAnimationName = "left";
+        else if (dx > 0) targetAnimationName = "right";
+        else if (dy < 0) targetAnimationName = "up";
+        else if (dy > 0) targetAnimationName = "down";
+
+        if (ballon.currentAnimationName !== targetAnimationName) {
+            ballon.currentAnimationName = targetAnimationName;
+            ballon.animationFrame = 0;
+            ballon.animationTimer = 0;
+        }
+
+        ballon.animationTimer += deltaTime;
+        const animConfig = animations_data.ballon;
+        const animationSequence = animConfig[ballon.currentAnimationName];
+        const numFrames = animationSequence.length;
+        const frameLength = animConfig.frame_length;
+
+        if (dx !== 0 || dy !== 0) {
+            if (ballon.animationTimer >= frameLength) {
+                ballon.animationFrame = (ballon.animationFrame + 1) % numFrames;
+                ballon.animationTimer -= frameLength;
+            }
+        }
+
+        const spriteCoord = animationSequence[ballon.animationFrame];
+        sprite_sheet.drawSprite(
+            ctx,
+            spriteCoord.x, spriteCoord.y,
+            ballon.current_x * TILE_SIZE,
+            ballon.current_y * TILE_SIZE
+        );
+    });
 
 
     for (const [_peer_name, player] of Object.entries(players)) {
@@ -287,8 +378,8 @@ const gameLoop = () => {
             }
         }
 
-        let targetAnimationName: PlayerActualAnimationName = player.currentAnimationName;
-        let newLastDirection: PlayerDirection = player.lastDirection;
+        let targetAnimationName: PlayerAnimationName = player.currentAnimationName;
+        let newLastDirection: Direction = player.lastDirection;
 
         if (player.vel_x < 0) {
             targetAnimationName = "left";
@@ -322,7 +413,7 @@ const gameLoop = () => {
         if (player.vel_x !== 0 || player.vel_y !== 0) {
             if (player.animationTimer >= frameLength) {
                 player.animationFrame = (player.animationFrame + 1) % numFrames;
-                player.animationTimer %= frameLength;
+                player.animationTimer -= frameLength; // Changed from %= for consistency
             }
         } else {
             player.animationFrame = 0;
@@ -377,19 +468,25 @@ const initGame = async () => {
                     canvas.height = message.map_height * TILE_SIZE;
                     map = message.map;
 
+                    // IMPORTANT: Set tick_length and other parameters BEFORE initializing entities that depend on them.
+                    player_speed = message.player_speed;
+                    tick_length = message.tick_length; // Set tick_length here
+                    peer_name = message.peer_name;
+
                     const clientPlayers: { [key: string]: Player } = {};
                     for (const pName in message.players) {
-                        clientPlayers[pName] = addAnimationDefaults(message.players[pName]);
+                        clientPlayers[pName] = addPlayerAnimationDefaults(message.players[pName]);
                     }
                     players = clientPlayers;
-                    balloons = message.ballons;
-                    player_speed = message.player_speed;
-                    peer_name = message.peer_name;
+
+                    // Now addBalloonAnimationDefaults can use the up-to-date global tick_length
+                    // and message.accumulated_time to correctly set initial state.
+                    balloons = message.ballons.map((ballon) => addBalloonAnimationDefaults(ballon, message.accumulated_time));
                     break;
 
                 case "new_player":
                     console.info("Info: New player message", message);
-                    players[message.peer_name] = addAnimationDefaults(message.player);
+                    players[message.peer_name] = addPlayerAnimationDefaults(message.player); // Use specific function
                     break;
 
                 case "player_disconnected":
@@ -410,7 +507,9 @@ const initGame = async () => {
 
                 case "game_update":
                     console.info("Info: Game update message", message);
-                    balloons = message.ballons;
+                    // For game_update, balloons are reset for a new movement segment.
+                    // addBalloonAnimationDefaults is called with no offset, so timers and positions reset to start.
+                    balloons = message.ballons.map(b => addBalloonAnimationDefaults(b));
                     break;
 
                 default:
