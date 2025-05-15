@@ -7,8 +7,8 @@ ini_set("memory_limit", "512M");
 
 const GAME_WIDTH = 31;
 const GAME_HEIGHT = 13;
-const BREAKABLE_WALL_DENSITY = 0.1; // chance of a breakable wall in a cell (0.0 - 1.0)
-const BALLOON_COUNT = 5;
+const BREAKABLE_WALL_DENSITY = 0.125; // chance of a breakable wall in a cell (0.0 - 1.0)
+const BALLOON_COUNT = 10;
 const TICK_LENGTH = 1;
 const PLAYER_SPEED = 5;
 const STREAM_SELECT_TIMEOUT_SEC = 0;
@@ -311,8 +311,6 @@ while (true) {
             )),
             get_clients($players)
         );
-
-
 
         $game_tick_accumulator -= TICK_LENGTH;
     }
