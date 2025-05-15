@@ -2,25 +2,8 @@ import "modern-normalize/modern-normalize.css";
 
 import "./style.css";
 
-import { SpriteSheet } from "./SpriteSheet";
-import {
-    Tile,
-    type AnimationsData,
-    type Direction,
-    type ServerPlayer,
-    type PlayerAnimationName,
-    type Player,
-    type ServerBalloon,
-    type BallonAnimationName,
-    type Balloon,
-    type GameMap,
-    type ServerMessage,
-} from "./types";
-
 import sprite_sheet_src from "./assets/sprite_sheet.png"
 import animations_data_json from "./data/animations.json";
-
-const animations_data: AnimationsData = animations_data_json;
 
 const SPRITE_SIZE = 16;
 const TILE_SIZE = 32;
@@ -45,6 +28,75 @@ let peer_name: string | null = null;
 
 let player_speed = 1;
 let tick_length = 1;
+
+type AnimationFrameCoord = { x: number; y: number };
+type AnimationSequence = Array<AnimationFrameCoord>;
+type AnimationsData = {
+    player: {
+        frame_length: number;
+        left: AnimationSequence;
+        down: AnimationSequence;
+        right: AnimationSequence;
+        up: AnimationSequence;
+        death: AnimationSequence;
+    }
+    ballon: {
+        frame_length: number;
+        left: AnimationSequence;
+        down: AnimationSequence;
+        right: AnimationSequence;
+        up: AnimationSequence;
+    }
+}
+
+const animations_data: AnimationsData = animations_data_json;
+
+enum Tile {
+    Wall = 0,
+    BreakableWall = 1,
+    Grass = 2,
+}
+
+type Direction = "left" | "right" | "up" | "down";
+
+type ServerPlayer = {
+    pos_x: number;
+    pos_y: number;
+    vel_x: number;
+    vel_y: number;
+}
+type PlayerAnimationName = Exclude<keyof AnimationsData["player"], "frame_length">;
+type Player = ServerPlayer & {
+    currentAnimationName: PlayerAnimationName;
+    animationFrame: number;
+    animationTimer: number;
+    lastDirection: Direction;
+};
+
+type ServerBalloon = {
+    from_x: number;
+    from_y: number;
+    to_x: number;
+    to_y: number;
+};
+type BallonAnimationName = Exclude<keyof AnimationsData["ballon"], "frame_length">;
+type Balloon = ServerBalloon & {
+    current_x: number;
+    current_y: number;
+    interpolationTimer: number;
+
+    currentAnimationName: BallonAnimationName;
+    animationFrame: number;
+    animationTimer: number;
+};
+
+type GameMap = Array<Array<Tile>>;
+type ServerMessage =
+    | { type: "connection"; map_width: number; map_height: number, map: GameMap, players: { [key: string]: ServerPlayer }, ballons: ServerBalloon[], accumulated_time: number, player_speed: number, tick_length: number, peer_name: string }
+    | { type: "new_player"; peer_name: string, player: ServerPlayer }
+    | { type: "player_disconnected"; peer_name: string }
+    | { type: "player_update", peer_name: string, player: ServerPlayer }
+    | { type: "game_update", ballons: Array<ServerBalloon> }
 
 let players: { [key: string]: Player } = {};
 let map: GameMap = [];
@@ -100,6 +152,74 @@ function addBalloonAnimationDefaults(serverData: ServerBalloon, animation_start_
         animationTimer: animation_start_offset_time,
     };
 }
+
+class SpriteSheet {
+    private readonly sprite_sheet_src: string;
+
+    private sprite_sheet: HTMLImageElement | null = null;
+    private isLoaded: boolean = false;
+
+    private readonly sprite_size: number;
+    private readonly tile_size: number;
+
+    public constructor(sprite_sheet_src: string, sprite_size: number, tile_size: number) {
+        this.sprite_sheet_src = sprite_sheet_src;
+        this.sprite_size = sprite_size;
+        this.tile_size = tile_size;
+    }
+
+    public async init(): Promise<void> {
+        console.info("Info: Initializing sprite sheet...");
+        return new Promise((resolve, reject) => {
+            if (this.checkLoaded()) {
+                console.warn("Warn: SpriteSheet already initialized");
+                resolve()
+            }
+
+            this.sprite_sheet = new Image();
+            this.sprite_sheet.src = this.sprite_sheet_src;
+            this.sprite_sheet.onload = () => {
+                console.info("Info: SpriteSheet initialized");
+                this.isLoaded = true;
+                resolve();
+            }
+
+            this.sprite_sheet.onerror = (error) => {
+                console.error("Error: Failed to initialize sprite sheet", error);
+                reject(error);
+            }
+        });
+    }
+
+    public checkLoaded(): boolean {
+        return this.sprite_sheet !== null && this.isLoaded;
+    }
+
+    /**
+     * Draws a sprite from the sprite sheet to the canvas.
+     * 
+     * @param ctx Context to draw on
+     * @param source_x X position of the sprite in the sprite sheet
+     * @param source_y Y position of the sprite in the sprite sheet
+     * @param dest_x X position to draw the sprite on the canvas
+     * @param dest_y Y position to draw the sprite on the canvas
+     * @returns void
+     */
+    public drawSprite(ctx: CanvasRenderingContext2D, source_x: number, source_y: number, dest_x: number, dest_y: number): void {
+        if (!this.checkLoaded()) {
+            console.error("Error: SpriteSheet not loaded");
+            return;
+        }
+
+        ctx.drawImage(
+            this.sprite_sheet!,
+            this.sprite_size * source_x, this.sprite_size * source_y,
+            this.sprite_size, this.sprite_size,
+            dest_x, dest_y,
+            this.tile_size, this.tile_size
+        );
+    }
+};
 
 const initWebSocket = async (): Promise<void> => {
     console.info("Info: Initializing WebSocket...");
@@ -224,7 +344,7 @@ const gameLoop = () => {
                 player.pos_x = next_player_pos_x;
             }
         } else if (dx < 0) {
-            const y1_check = Math.floor(player.pos_y + 0.5);
+            const y1_check = Math.floor(player.pos_y + 0.05);
             const y2_check = Math.floor(player.pos_y + 1 - 0.05);
             const collision_tile_x = Math.floor(next_player_pos_x);
 
