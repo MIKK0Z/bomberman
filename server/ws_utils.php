@@ -168,21 +168,15 @@ function ws_send(string $message, $clients): void {
     $payload_len = strlen($payload);
 
     $frame_header = "";
-    // FIN bit + Opcode (1 for text frame)
     $frame_header .= chr(0x81);
 
     if ($payload_len <= 125) {
-        // Mask bit (0) + Payload length (7 bits)
         $frame_header .= chr($payload_len);
     } elseif ($payload_len <= 65535) {
-        // Mask bit (0) + 126 (16-bit length follows)
         $frame_header .= chr(126);
-        // Payload length (16 bits, network byte order)
         $frame_header .= pack("n", $payload_len);
     } else {
-        // Mask bit (0) + 127 (64-bit length follows)
         $frame_header .= chr(127);
-        // Payload length (64 bits, network byte order)
         $frame_header .= pack("J", $payload_len);
     }
 

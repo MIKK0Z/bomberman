@@ -57,6 +57,14 @@ enum Tile {
     Grass = 2,
 }
 
+enum State {
+    Alive = 0,
+    Dying = 1,
+    Dead = 2,
+}
+
+let game_state: State = State.Alive;
+
 type Direction = "left" | "right" | "up" | "down";
 
 type ServerPlayer = {
@@ -71,6 +79,7 @@ type Player = ServerPlayer & {
     animationFrame: number;
     animationTimer: number;
     lastDirection: Direction;
+    state: State;
 };
 
 type ServerBalloon = {
@@ -97,10 +106,13 @@ type ServerMessage =
     | { type: "player_disconnected"; peer_name: string }
     | { type: "player_update", peer_name: string, player: ServerPlayer }
     | { type: "game_update", ballons: Array<ServerBalloon> }
+    | { type: "player_died", peer_name: string }
 
 let players: { [key: string]: Player } = {};
 let map: GameMap = [];
 let balloons: Array<Balloon> = [];
+
+// let game_state: GameState = GameState.Playing;
 
 function isWallAt(tile_x: number, tile_y: number, map: GameMap): boolean {
     if (!map || map.length === 0 || !map[0] || map[0].length === 0) return true;
@@ -117,6 +129,7 @@ function addPlayerAnimationDefaults(serverData: ServerPlayer): Player {
         animationFrame: 0,
         animationTimer: 0,
         lastDirection: "down",
+        state: State.Alive,
     };
 }
 
@@ -327,7 +340,6 @@ const gameLoop = () => {
         );
     });
 
-
     for (const [players_peer_name, player] of Object.entries(players)) {
         const dx = player.vel_x * player_speed * deltaTime;
         const dy = player.vel_y * player_speed * deltaTime;
@@ -378,63 +390,82 @@ const gameLoop = () => {
             }
         }
 
-
-
-        let targetAnimationName: PlayerAnimationName = player.currentAnimationName;
-        let newLastDirection: Direction = player.lastDirection;
-
-        if (player.vel_x < 0) {
-            targetAnimationName = "left";
-            newLastDirection = "left";
-        } else if (player.vel_x > 0) {
-            targetAnimationName = "right";
-            newLastDirection = "right";
-        } else if (player.vel_y < 0) {
-            targetAnimationName = "up";
-            newLastDirection = "up";
-        } else if (player.vel_y > 0) {
-            targetAnimationName = "down";
-            newLastDirection = "down";
-        } else {
-            targetAnimationName = player.lastDirection;
-        }
-
-        for (const balloon of balloons) {
-            if (
-                player.pos_x < balloon.current_x + 1 &&
-                player.pos_x + 1 > balloon.current_x &&
-                player.pos_y < balloon.current_y + 1 &&
-                player.pos_y + 1 > balloon.current_y
-            ) {
-                console.log(`Player ${players_peer_name} collided with a balloon!`);
-                targetAnimationName = "death";
+        if (players_peer_name === peer_name && player.state === State.Alive) {
+            for (const balloon of balloons) {
+                if (
+                    player.pos_x < balloon.current_x + 1 &&
+                    player.pos_x + 1 > balloon.current_x &&
+                    player.pos_y < balloon.current_y + 1 &&
+                    player.pos_y + 1 > balloon.current_y
+                ) {
+                    if (!ws) return;
+                    ws.send(JSON.stringify({ type: "player_died", peer_name: players_peer_name }));
+                }
             }
         }
 
-        if (player.currentAnimationName !== targetAnimationName || player.lastDirection !== newLastDirection) {
-            player.currentAnimationName = targetAnimationName;
-            player.animationFrame = 0;
-            player.animationTimer = 0;
-        }
-        player.lastDirection = newLastDirection;
+        if (player.state === State.Alive) {
+            let targetAnimationName: PlayerAnimationName = player.currentAnimationName;
+            let newLastDirection: Direction = player.lastDirection;
 
-        player.animationTimer += deltaTime;
+            if (player.vel_x < 0) {
+                targetAnimationName = "left";
+                newLastDirection = "left";
+            } else if (player.vel_x > 0) {
+                targetAnimationName = "right";
+                newLastDirection = "right";
+            } else if (player.vel_y < 0) {
+                targetAnimationName = "up";
+                newLastDirection = "up";
+            } else if (player.vel_y > 0) {
+                targetAnimationName = "down";
+                newLastDirection = "down";
+            } else {
+                targetAnimationName = player.lastDirection;
+            }
 
-        const animationSequence = animations_data.player[player.currentAnimationName];
-        const numFrames = animationSequence.length;
-        const frameLength = animations_data.player.frame_length;
+            if (player.currentAnimationName !== targetAnimationName || player.lastDirection !== newLastDirection) {
+                player.currentAnimationName = targetAnimationName;
+                player.animationFrame = 0;
+                player.animationTimer = 0;
+            }
+            player.lastDirection = newLastDirection;
 
-        if (player.vel_x !== 0 || player.vel_y !== 0) {
+            player.animationTimer += deltaTime;
+
+            const animationSequence = animations_data.player[player.currentAnimationName];
+            const numFrames = animationSequence.length;
+            const frameLength = animations_data.player.frame_length;
+
+            if (player.vel_x !== 0 || player.vel_y !== 0) {
+                if (player.animationTimer >= frameLength) {
+                    player.animationFrame = (player.animationFrame + 1) % numFrames;
+                    player.animationTimer -= frameLength;
+                }
+            } else {
+                player.animationFrame = 0;
+            }
+
+            const spriteCoord = animationSequence[player.animationFrame];
+            sprite_sheet.drawSprite(ctx, spriteCoord.x, spriteCoord.y, player.pos_x * TILE_SIZE, player.pos_y * TILE_SIZE);
+        } else if (player.state === State.Dying) {
+            player.animationTimer += deltaTime;
+            const animationSequence = animations_data.player.death;
+            const numFrames = animationSequence.length;
+            const frameLength = animations_data.player.frame_length;
+
             if (player.animationTimer >= frameLength) {
                 player.animationFrame = (player.animationFrame + 1) % numFrames;
-                player.animationTimer -= frameLength; // Changed from %= for consistency
+                player.animationTimer -= frameLength;
             }
-        } else {
-            player.animationFrame = 0;
-        }
 
-        const spriteCoord = animationSequence[player.animationFrame];
-        sprite_sheet.drawSprite(ctx, spriteCoord.x, spriteCoord.y, player.pos_x * TILE_SIZE, player.pos_y * TILE_SIZE);
+            if (player.animationFrame === numFrames - 1) {
+                player.state = State.Dead;
+            }
+
+            const spriteCoord = animationSequence[player.animationFrame];
+            sprite_sheet.drawSprite(ctx, spriteCoord.x, spriteCoord.y, player.pos_x * TILE_SIZE, player.pos_y * TILE_SIZE);
+        }
     }
 
     requestAnimationFrame(gameLoop);
@@ -443,20 +474,20 @@ const gameLoop = () => {
 const initGame = async () => {
     console.info("Info: Initializing game...");
     document.addEventListener("keydown", (event) => {
-        if (!event.key.startsWith("Arrow") || event.repeat) {
+        if (!event.key.startsWith("Arrow") || event.repeat || game_state !== State.Alive) {
             return;
         }
         pressedKeys.add(event.key.slice(5));
 
-        if (ws && peer_name) ws.send(JSON.stringify({ ...parsePresedKeys(pressedKeys), pos_x: players[peer_name].pos_x, pos_y: players[peer_name].pos_y }));
+        if (ws && peer_name) ws.send(JSON.stringify({ type: "player_move", ...parsePresedKeys(pressedKeys), pos_x: players[peer_name].pos_x, pos_y: players[peer_name].pos_y }));
     });
     document.addEventListener("keyup", (event) => {
-        if (!event.key.startsWith("Arrow") || event.repeat) {
+        if (!event.key.startsWith("Arrow") || event.repeat || game_state !== State.Alive) {
             return;
         }
         pressedKeys.delete(event.key.slice(5));
 
-        if (ws && peer_name) ws.send(JSON.stringify({ ...parsePresedKeys(pressedKeys), pos_x: players[peer_name].pos_x, pos_y: players[peer_name].pos_y }));
+        if (ws && peer_name) ws.send(JSON.stringify({ type: "player_move", ...parsePresedKeys(pressedKeys), pos_x: players[peer_name].pos_x, pos_y: players[peer_name].pos_y }));
     });
 
     try {
@@ -497,7 +528,7 @@ const initGame = async () => {
 
                 case "new_player":
                     console.info("Info: New player message", message);
-                    players[message.peer_name] = addPlayerAnimationDefaults(message.player); // Use specific function
+                    players[message.peer_name] = addPlayerAnimationDefaults(message.player);
                     break;
 
                 case "player_disconnected":
@@ -521,6 +552,23 @@ const initGame = async () => {
                     balloons = message.ballons.map(ballon => addBalloonAnimationDefaults(ballon));
                     break;
 
+                case "player_died":
+                    console.info("Info: Player died message", message);
+                    const playerToDie = players[message.peer_name];
+                    if (playerToDie && playerToDie.state === State.Alive) {
+                        playerToDie.state = State.Dying;
+                        playerToDie.animationFrame = 0;
+                        playerToDie.animationTimer = 0;
+                        playerToDie.vel_x = 0;
+                        playerToDie.vel_y = 0;
+                    }
+
+                    if (message.peer_name === peer_name) {
+                        game_state = State.Dying;
+                    }
+
+                    break;
+
                 default:
                     console.warn("Warn: Unknown message type", message);
             }
@@ -534,6 +582,8 @@ const initGame = async () => {
 }
 
 const parsePresedKeys = (pressedKeys: Set<string>): { vel_x: number, vel_y: number } => {
+    if (game_state !== State.Alive) return { vel_x: 0, vel_y: 0 };
+
     let vel_x = 0;
     if (pressedKeys.has("Left")) {
         vel_x += -1;

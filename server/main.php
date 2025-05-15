@@ -208,24 +208,48 @@ while (true) {
             } else {
                 printf("Received message from player %s: %s\n", $peer_name, $decoded_result);
                 $decoded_result = json_decode($decoded_result, true);
-                if (!$decoded_result || !isset($decoded_result["vel_x"], $decoded_result["vel_y"], $decoded_result["pos_x"], $decoded_result["pos_y"])) {
-                    fprintf(STDERR, "Error: Invalid message format from player %s\n", $peer_name);
+                if (!$decoded_result || !isset($decoded_result["type"])) {
+                    fprintf(STDERR, "Error: Invalid JSON message from player %s\n", $peer_name);
                     continue;
                 }
 
-                $current_player->setVelX($decoded_result["vel_x"]);
-                $current_player->setVelY($decoded_result["vel_y"]);
-                $current_player->setPosX($decoded_result["pos_x"]);
-                $current_player->setPosY($decoded_result["pos_y"]);
+                if ($decoded_result["type"] === "player_move") {
+                    if (!isset($decoded_result["vel_x"], $decoded_result["vel_y"], $decoded_result["pos_x"], $decoded_result["pos_y"])) {
+                        fprintf(STDERR, "Error: Invalid player_move message format from player %s\n", $peer_name);
+                        continue;
+                    }
 
-                ws_send(
-                    json_encode(array(
-                        "type" => "player_update",
-                        "peer_name" => $peer_name,
-                        "player" => $current_player,
-                    )),
-                    get_clients($players)
-                );
+                    $current_player->setVelX($decoded_result["vel_x"]);
+                    $current_player->setVelY($decoded_result["vel_y"]);
+                    $current_player->setPosX($decoded_result["pos_x"]);
+                    $current_player->setPosY($decoded_result["pos_y"]);
+
+                    ws_send(
+                        json_encode(array(
+                            "type" => "player_update",
+                            "peer_name" => $peer_name,
+                            "player" => $current_player,
+                        )),
+                        get_clients($players)
+                    );
+                } else if ($decoded_result["type"] === "player_died") {
+                    if (!isset($decoded_result["peer_name"])) {
+                        fprintf(STDERR, "Error: Invalid player_died message format from player %s\n", $peer_name);
+                        continue;
+                    }
+                    $peer_name = $decoded_result["peer_name"];
+
+                    ws_send(
+                        json_encode(array(
+                            "type" => "player_died",
+                            "peer_name" => $peer_name,
+                        )),
+                        get_clients($players)
+                    );
+                } else {
+                    fprintf(STDERR, "Error: Unknown message type from player %s: %s\n", $peer_name, $decoded_result["type"]);
+                    continue;
+                }
             }
         }
     }
@@ -237,13 +261,10 @@ while (true) {
     $game_tick_accumulator += $delta_time;
 
     while ($game_tick_accumulator >= TICK_LENGTH) {
-        // Move ballons and determine their next target
         foreach ($ballons as $ballon) {
-            // 1. Move ballon to its current target destination for this tick
             $ballon->setFromX($ballon->getToX());
             $ballon->setFromY($ballon->getToY());
 
-            // 2. Ballon has reached its destination, find a new target for the next tick
             $current_x = $ballon->getFromX();
             $current_y = $ballon->getFromY();
 
@@ -251,17 +272,16 @@ while (true) {
             do {
                 $adjacent_grass_tiles = array();
                 $potential_neighbors = array(
-                    array("y" => $current_y - 1, "x" => $current_x), // Up
-                    array("y" => $current_y + 1, "x" => $current_x), // Down
-                    array("y" => $current_y, "x" => $current_x - 1), // Left
-                    array("y" => $current_y, "x" => $current_x + 1), // Right
+                    array("y" => $current_y - 1, "x" => $current_x),
+                    array("y" => $current_y + 1, "x" => $current_x),
+                    array("y" => $current_y, "x" => $current_x - 1),
+                    array("y" => $current_y, "x" => $current_x + 1),
                 );
 
                 foreach ($potential_neighbors as $neighbor) {
                     $nx = $neighbor["x"];
                     $ny = $neighbor["y"];
 
-                    // Check bounds and if the tile is grass
                     if (
                         $nx >= 0 && $nx < GAME_WIDTH &&
                         $ny >= 0 && $ny < GAME_HEIGHT &&
@@ -277,21 +297,17 @@ while (true) {
                     $ballon->setToX($chosen_neighbor["x"]);
                     $ballon->setToY($chosen_neighbor["y"]);
                 } else {
-                    // If no valid move (e.g., ballon is trapped),
-                    // set its next target to its current position.
-                    // It will effectively stay put and re-evaluate in the next tick.
                     $ballon->setToX($current_x);
                     $ballon->setToY($current_y);
                 }
-                $new_target_determined = true; // A target is always determined in this pass
+                $new_target_determined = true;
             } while (!$new_target_determined);
         }
 
         ws_send(
             json_encode(array(
                 "type" => "game_update",
-                "ballons" => $ballons, // Add balloons to game_update message
-                // You can add more data to the game_update message if needed
+                "ballons" => $ballons,
             )),
             get_clients($players)
         );
