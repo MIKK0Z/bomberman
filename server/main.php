@@ -7,8 +7,8 @@ ini_set("memory_limit", "512M");
 
 const GAME_WIDTH = 31;
 const GAME_HEIGHT = 13;
-const BREAKABLE_WALL_DENSITY = 0.1; // chance of a breakable wall in a cell (0.0 - 1.0)
-const BALLOON_COUNT = 5;
+const BREAKABLE_WALL_DENSITY = 0.125; // chance of a breakable wall in a cell (0.0 - 1.0)
+const BALLOON_COUNT = 10;
 const TICK_LENGTH = 1;
 const PLAYER_SPEED = 5;
 const STREAM_SELECT_TIMEOUT_SEC = 0;
@@ -237,13 +237,10 @@ while (true) {
     $game_tick_accumulator += $delta_time;
 
     while ($game_tick_accumulator >= TICK_LENGTH) {
-        // Move ballons and determine their next target
         foreach ($ballons as $ballon) {
-            // 1. Move ballon to its current target destination for this tick
             $ballon->setFromX($ballon->getToX());
             $ballon->setFromY($ballon->getToY());
 
-            // 2. Ballon has reached its destination, find a new target for the next tick
             $current_x = $ballon->getFromX();
             $current_y = $ballon->getFromY();
 
@@ -251,17 +248,16 @@ while (true) {
             do {
                 $adjacent_grass_tiles = array();
                 $potential_neighbors = array(
-                    array("y" => $current_y - 1, "x" => $current_x), // Up
-                    array("y" => $current_y + 1, "x" => $current_x), // Down
-                    array("y" => $current_y, "x" => $current_x - 1), // Left
-                    array("y" => $current_y, "x" => $current_x + 1), // Right
+                    array("y" => $current_y - 1, "x" => $current_x),
+                    array("y" => $current_y + 1, "x" => $current_x),
+                    array("y" => $current_y, "x" => $current_x - 1),
+                    array("y" => $current_y, "x" => $current_x + 1),
                 );
 
                 foreach ($potential_neighbors as $neighbor) {
                     $nx = $neighbor["x"];
                     $ny = $neighbor["y"];
 
-                    // Check bounds and if the tile is grass
                     if (
                         $nx >= 0 && $nx < GAME_WIDTH &&
                         $ny >= 0 && $ny < GAME_HEIGHT &&
@@ -277,26 +273,20 @@ while (true) {
                     $ballon->setToX($chosen_neighbor["x"]);
                     $ballon->setToY($chosen_neighbor["y"]);
                 } else {
-                    // If no valid move (e.g., ballon is trapped),
-                    // set its next target to its current position.
-                    // It will effectively stay put and re-evaluate in the next tick.
                     $ballon->setToX($current_x);
                     $ballon->setToY($current_y);
                 }
-                $new_target_determined = true; // A target is always determined in this pass
+                $new_target_determined = true;
             } while (!$new_target_determined);
         }
 
         ws_send(
             json_encode(array(
                 "type" => "game_update",
-                "ballons" => $ballons, // Add balloons to game_update message
-                // You can add more data to the game_update message if needed
+                "ballons" => $ballons,
             )),
             get_clients($players)
         );
-
-
 
         $game_tick_accumulator -= TICK_LENGTH;
     }
