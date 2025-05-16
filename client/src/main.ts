@@ -114,34 +114,21 @@ let balloons: Array<Balloon> = [];
 
 // let game_state: GameState = GameState.Playing;
 
-let voices = [];
+let voices: Array<SpeechSynthesisVoice> = [];
 
 function populateVoiceList() {
-    let utterance = new SpeechSynthesisUtterance("Witaj świecie!");
     const synth = window.speechSynthesis;
     voices = synth.getVoices();
-    console.log(voices);
-    // "Chrome, at least, used to permit speech by default without user interaction, but that changed"
-    // dodałem buttona by to przetestować
-    speak();
 };
 
-function speak() {
+function speak(text: string) {
     let utterance = new SpeechSynthesisUtterance("Hello world!");
-    utterance.voice = voices[0]; // u mnie Zosia
-    utterance.pitch = 1; // 0-2 (1 default)
-    utterance.rate = 1; // 1 default, 0.5 - o połowę wolniej, 2 - dwa razy szybciej, itd.
+    utterance.voice = voices[0];
+    utterance.pitch = 1;
+    utterance.rate = 1;
 
-    console.log(utterance)
     speechSynthesis.speak(utterance);
 }
-
-// chrome/safari - onvoicechanged, firefox - nie
-// populateVoiceList();
-// speak();
-// setInterval(() => {
-//     speak();
-// }, 5000);
 
 if (speechSynthesis.onvoiceschanged !== undefined) {
     speechSynthesis.onvoiceschanged = populateVoiceList;
@@ -550,7 +537,6 @@ const initGame = async () => {
         }
         ws.onmessage = (event) => {
             const message: ServerMessage = JSON.parse(event.data);
-            speak()
             switch (message.type) {
                 case "connection":
                     console.info("Info: Connection message", message);
@@ -569,11 +555,15 @@ const initGame = async () => {
                     players = clientPlayers;
 
                     balloons = message.ballons.map((ballon) => addBalloonAnimationDefaults(ballon, message.accumulated_time));
+
+                    speak("Skibidi");
                     break;
 
                 case "new_player":
                     console.info("Info: New player message", message);
                     players[message.peer_name] = addPlayerAnimationDefaults(message.player);
+
+                    speak("Susior amogusior");
                     break;
 
                 case "player_disconnected":
@@ -611,6 +601,8 @@ const initGame = async () => {
                     if (message.peer_name === peer_name) {
                         game_state = State.Dying;
                     }
+
+                    speak("Hawk tuah");
 
                     break;
 
