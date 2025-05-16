@@ -114,6 +114,40 @@ let balloons: Array<Balloon> = [];
 
 // let game_state: GameState = GameState.Playing;
 
+let voices = [];
+
+function populateVoiceList() {
+    let utterance = new SpeechSynthesisUtterance("Witaj świecie!");
+    const synth = window.speechSynthesis;
+    voices = synth.getVoices();
+    console.log(voices);
+    // "Chrome, at least, used to permit speech by default without user interaction, but that changed"
+    // dodałem buttona by to przetestować
+    speak();
+};
+
+function speak() {
+    let utterance = new SpeechSynthesisUtterance("Hello world!");
+    utterance.voice = voices[0]; // u mnie Zosia
+    utterance.pitch = 1; // 0-2 (1 default)
+    utterance.rate = 1; // 1 default, 0.5 - o połowę wolniej, 2 - dwa razy szybciej, itd.
+
+    console.log(utterance)
+    speechSynthesis.speak(utterance);
+}
+
+// chrome/safari - onvoicechanged, firefox - nie
+// populateVoiceList();
+// speak();
+// setInterval(() => {
+//     speak();
+// }, 5000);
+
+if (speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = populateVoiceList;
+}
+
+
 function isWallAt(tile_x: number, tile_y: number, map: GameMap): boolean {
     if (!map || map.length === 0 || !map[0] || map[0].length === 0) return true;
     if (tile_x < 0 || tile_x >= map[0].length || tile_y < 0 || tile_y >= map.length) return true;
@@ -498,6 +532,8 @@ const initGame = async () => {
         if (ws && peer_name) ws.send(JSON.stringify({ type: "player_move", ...parsePresedKeys(pressedKeys), pos_x: players[peer_name].pos_x, pos_y: players[peer_name].pos_y }));
     });
 
+    populateVoiceList();
+
     try {
         sprite_sheet = new SpriteSheet(sprite_sheet_src, SPRITE_SIZE, TILE_SIZE);
         await sprite_sheet.init();
@@ -514,6 +550,7 @@ const initGame = async () => {
         }
         ws.onmessage = (event) => {
             const message: ServerMessage = JSON.parse(event.data);
+            speak()
             switch (message.type) {
                 case "connection":
                     console.info("Info: Connection message", message);
