@@ -262,6 +262,11 @@ const gameLoop = () => {
         return;
     }
 
+    if (game_state === State.Dead) {
+        window.location.reload();
+        return;
+    }
+
     const currentTime = performance.now();
     const deltaTime = (currentTime - lastFrameTime) / 1000;
     lastFrameTime = currentTime;
@@ -461,6 +466,9 @@ const gameLoop = () => {
 
             if (player.animationFrame === numFrames - 1) {
                 player.state = State.Dead;
+                if (players_peer_name === peer_name) {
+                    game_state = State.Dead;
+                }
             }
 
             const spriteCoord = animationSequence[player.animationFrame];
