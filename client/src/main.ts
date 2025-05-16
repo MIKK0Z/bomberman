@@ -122,7 +122,7 @@ function populateVoiceList() {
 };
 
 function speak(text: string) {
-    let utterance = new SpeechSynthesisUtterance("Hello world!");
+    let utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = voices[0];
     utterance.pitch = 1;
     utterance.rate = 1;
