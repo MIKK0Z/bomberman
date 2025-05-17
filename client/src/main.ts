@@ -285,6 +285,7 @@ const gameLoop = () => {
     }
 
     if (game_state === State.Dead) {
+        console.info("Info: Game over, reloading...");
         window.location.reload();
         return;
     }
