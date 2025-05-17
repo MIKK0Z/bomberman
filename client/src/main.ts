@@ -112,8 +112,6 @@ let players: { [key: string]: Player } = {};
 let map: GameMap = [];
 let balloons: Array<Balloon> = [];
 
-// let game_state: GameState = GameState.Playing;
-
 let voices: Array<SpeechSynthesisVoice> = [];
 
 function populateVoiceList() {
