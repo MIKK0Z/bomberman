@@ -556,14 +556,14 @@ const initGame = async () => {
 
                     balloons = message.ballons.map((ballon) => addBalloonAnimationDefaults(ballon, message.accumulated_time));
 
-                    speak("Skibidi");
                     break;
 
                 case "new_player":
                     console.info("Info: New player message", message);
                     players[message.peer_name] = addPlayerAnimationDefaults(message.player);
 
-                    speak("Susior amogusior");
+                    speak("czesc")
+
                     break;
 
                 case "player_disconnected":
@@ -596,13 +596,12 @@ const initGame = async () => {
                         playerToDie.animationTimer = 0;
                         playerToDie.vel_x = 0;
                         playerToDie.vel_y = 0;
+                        speak("ups");
                     }
 
                     if (message.peer_name === peer_name) {
                         game_state = State.Dying;
                     }
-
-                    speak("Hawk tuah");
 
                     break;
 
