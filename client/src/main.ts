@@ -127,6 +127,7 @@ function speak(text: string) {
     utterance.pitch = 1;
     utterance.rate = 1;
 
+    console.log("Info: Speaking", text);
     speechSynthesis.speak(utterance);
 }
 
@@ -555,6 +556,8 @@ const initGame = async () => {
                     players = clientPlayers;
 
                     balloons = message.ballons.map((ballon) => addBalloonAnimationDefaults(ballon, message.accumulated_time));
+
+                    speak("czesc");
 
                     break;
 
